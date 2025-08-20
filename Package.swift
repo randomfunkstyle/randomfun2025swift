@@ -14,7 +14,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // Add any external dependencies here
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0")
     ],
     targets: [
         .target(
@@ -23,7 +23,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "ICFPWorkerCLI",
-            dependencies: ["ICFPWorkerLib"]
+            dependencies: [
+                "ICFPWorkerLib",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ]
         ),
         .testTarget(
             name: "ICFPWorkerLibTests",
