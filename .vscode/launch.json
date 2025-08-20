@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:randomfun2025swift}",
+            "name": "Debug icfpworker",
+            "program": "${workspaceFolder:randomfun2025swift}/.build/debug/icfpworker",
+            "preLaunchTask": "swift: Build Debug icfpworker"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:randomfun2025swift}",
+            "name": "Release icfpworker",
+            "program": "${workspaceFolder:randomfun2025swift}/.build/release/icfpworker",
+            "preLaunchTask": "swift: Build Release icfpworker"
+        }
+    ]
+}
