@@ -1,9 +1,11 @@
 import Foundation
-@testable import ICFPWorkerLib
 
 /// Mock implementation of ExplorationClient for testing
 /// Simulates a predefined hexagonal graph structure
-class MockExplorationClient: ExplorationClient {
+///
+public class MockExplorationClient: ExplorationClient {
+    
+    
     /// Labels for each room in the mock graph
     private var roomLabels: [Int] = [0, 1, 2, 3, 0, 1]
     /// Room connections: roomId -> [door -> targetRoom]
@@ -15,10 +17,15 @@ class MockExplorationClient: ExplorationClient {
     
     /// Initialize with optional simple hexagon structure
     /// - Parameter simpleHexagon: If true, creates a 6-room hexagonal graph
-    init(simpleHexagon: Bool = true) {
+    public init(simpleHexagon: Bool = true) {
         if simpleHexagon {
             setupSimpleHexagon()
         }
+    }
+    
+    /// Simulate problem selection
+    public func selectProblem(problemName: String) async throws -> ICFPWorkerLib.SelectResponse {
+        return SelectResponse(problemName: problemName)
     }
     
     /// Setup a simple 6-room hexagonal graph for testing
@@ -73,7 +80,7 @@ class MockExplorationClient: ExplorationClient {
     
     /// Simulate exploration of paths in the mock graph
     /// Returns room labels observed along each path
-    func explore(plans: [String]) async throws -> ExploreResponse {
+    public func explore(plans: [String]) async throws -> ExploreResponse {
         queryCount += 1
         var results: [[Int]] = []
         
@@ -113,7 +120,7 @@ class MockExplorationClient: ExplorationClient {
         return labels
     }
     
-    func submitGuess(map: MapDescription) async throws -> GuessResponse {
+    public func submitGuess(map: MapDescription) async throws -> GuessResponse {
         if let correct = correctMap {
             let isCorrect = mapsAreEquivalent(map1: map, map2: correct)
             return GuessResponse(correct: isCorrect)
@@ -134,6 +141,10 @@ class MockExplorationClient: ExplorationClient {
 
 /// Mock client that always fails - for testing error handling
 class MockFailingClient: ExplorationClient {
+    func selectProblem(problemName: String) async throws -> ICFPWorkerLib.SelectResponse {
+        throw URLError(.badServerResponse)
+    }
+    
     /// Always throws an error
     func explore(plans: [String]) async throws -> ExploreResponse {
         throw URLError(.badServerResponse)
@@ -147,6 +158,10 @@ class MockFailingClient: ExplorationClient {
 
 /// Mock client that returns empty results - for edge case testing
 class MockEmptyClient: ExplorationClient {
+    func selectProblem(problemName: String) async throws -> ICFPWorkerLib.SelectResponse {
+        return SelectResponse(problemName: problemName)
+    }
+    
     /// Returns empty label arrays for all paths
     func explore(plans: [String]) async throws -> ExploreResponse {
         return ExploreResponse(results: plans.map { _ in [] }, queryCount: 0)

@@ -3,12 +3,12 @@ public class Worker {
     // Take a problem
 
     let problem: Problem
-    let client: HTTPTaskClient
+    let client: ExplorationClient
 
     private var iterations: Int = 0
 
-    public init(problem: Problem) {
-        client = HTTPTaskClient(config: EnvConfig())
+    public init(problem: Problem, client: ExplorationClient) {
+        self.client = client
         self.problem = problem
     }
 
@@ -33,7 +33,7 @@ public class Worker {
         let guess = generateGuess()
         print("Generated guess: \(guess)")
 
-        let guessResponse = try await client.guess(map: guess)
+        let guessResponse = try await client.submitGuess(map: guess)
         print("Guess response: \(guessResponse)")
     }
 
