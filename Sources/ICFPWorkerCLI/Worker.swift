@@ -135,6 +135,16 @@ struct CountLines: AsyncParsableCommand {
                     problem: .probatio,
                     layout: .fromFile("six_rooms_star.md")
                 ).run()
+            case "TestConfigs":
+                print("🔧 Testing new config system...")
+                TestConfigLoader.testLoadConfig()
+            case "TestAllConfigs":
+                print("🔍 Testing all config files...")
+                TestAllConfigs.testAllConfigFiles()
+            case "DebugThreeRooms":
+                DebugValidation.debugThreeRooms()
+            case "TestDisconnected":
+                TestDisconnected.test()
             default:
                 print("Unknown worker: \(workerName)")
                 print("Available workers:")
