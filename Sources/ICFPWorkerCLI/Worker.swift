@@ -29,11 +29,14 @@ struct CountLines: AsyncParsableCommand {
     }
 }
 
-if #available(macOS 12.0, *) {
-    do {
-        try await CountLines().run()
-    } catch {
-        print("Error: \(error)")
-        exit(1)
+@main
+struct Main {
+    static func main() async {
+        do {
+            try await CountLines().run()
+        } catch {
+            print("Error: \(error)")
+            exit(1)
+        }
     }
 }
