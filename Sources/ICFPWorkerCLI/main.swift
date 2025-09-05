@@ -31,10 +31,10 @@ struct CountLines: AsyncParsableCommand {
             print("Valid: \(worker.validate(input))")
         }
 
-        // let client = HTTPTaskClient(url: "http://localhost:8000")
-        // let task = try await client.getTask(id: "task001")
-        // print("\nFetched Task:")
-        // print("ID: \(task.id)")
+        // let config = EnvConfig()
+        // let client = HTTPTaskClient(config: config)
+        // let selected = try await client.selectProblem(problemName: "probatio")
+        // print("Select problem result: \(selected.problemName)")
 
         print("\n✅ ICFP Worker completed successfully!")
     }
