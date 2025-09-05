@@ -25,9 +25,9 @@ public class ExperimentalTests {
         // Test all configurations
         await testAllMapsWithMultiIteration()
         
-        // Debug the failing case
-        print("\n🔍 DEBUGGING three_rooms_one_loop:")
-        await testMultiIterationMapping("three_rooms_one_loop.config")
+        // Test the new 6-room map
+        print("\n🔍 TESTING six_rooms_circular:")
+        await testMultiIterationMapping("six_rooms_circular.config")
     }
     
     private static func testPhase1AnalyzerOnAllMaps() async {
@@ -398,7 +398,8 @@ public class ExperimentalTests {
             ("three_rooms_two_loops.config", 3),
             ("three_rooms_three_loops.config", 3),
             ("three_rooms_four_loops.config", 3),
-            ("three_rooms_five_loops.config", 3)
+            ("three_rooms_five_loops.config", 3),
+            ("six_rooms_circular.config", 6)
         ]
         
         var results: [(config: String, iterations: Int, success: Bool)] = []

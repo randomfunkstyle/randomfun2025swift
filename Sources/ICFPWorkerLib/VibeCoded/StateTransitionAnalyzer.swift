@@ -41,6 +41,45 @@ public class StateTransitionAnalyzer {
         }
     }
     
+    /// Signature that uniquely identifies a room based on its connections
+    public struct RoomSignature: Hashable, Equatable {
+        public let label: Int
+        public let selfLoops: Set<Int>  // Doors that loop back to same room
+        public let transitions: Set<ConnectionPattern>  // Non-self-loop connections
+        public let canonicalPath: String  // Shortest path from start to this room
+        
+        public struct ConnectionPattern: Hashable {
+            let door: Int
+            let targetLabel: Int
+        }
+        
+        public func matches(_ other: RoomSignature) -> Bool {
+            // Two signatures match if they have same label AND
+            // either same canonical path OR same connection pattern
+            if label != other.label {
+                return false
+            }
+            
+            // Same canonical path means same room
+            if canonicalPath == other.canonicalPath {
+                return true
+            }
+            
+            // Same connection pattern might mean same room
+            return selfLoops == other.selfLoops &&
+                   transitions == other.transitions
+        }
+        
+        /// Create a fingerprint string for easy comparison
+        public var fingerprint: String {
+            let selfLoopStr = selfLoops.sorted().map { String($0) }.joined()
+            let transStr = transitions.sorted { $0.door < $1.door }
+                .map { "\($0.door):\($0.targetLabel)" }
+                .joined(separator: ",")
+            return "L\(label)-P[\(canonicalPath)]-S[\(selfLoopStr)]-T[\(transStr)]"
+        }
+    }
+    
     private var stateLabels: [String: Int] = [:]
     private var transitions: [Transition] = []
     private var exploredPaths: Set<String> = []
@@ -136,28 +175,82 @@ public class StateTransitionAnalyzer {
     public func identifyRooms() -> [Room] {
         guard let startLabel = stateLabels[""] else { return [] }
         
-        // Map unique labels to room IDs
-        let uniqueLabels = Set(stateLabels.values).sorted()
-        var labelToRoomId: [Int: Int] = [:]
-        var rooms: [Room] = []
+        // Step 1: Build signatures for each state
+        var stateSignatures: [String: RoomSignature] = [:]
         
-        // Create one room per unique label
-        for label in uniqueLabels {
-            labelToRoomId[label] = label  // Use label as room ID
-            let states = stateLabels.compactMap { (state, stateLabel) in
-                stateLabel == label ? state : nil
-            }
-            let room = Room(id: label, label: label, states: Set(states))
-            rooms.append(room)
+        for (state, label) in stateLabels {
+            let signature = buildSignatureForState(state, label: label)
+            stateSignatures[state] = signature
         }
         
-        // Step 1: Map ALL transitions to room connections
-        for transition in transitions {
-            let fromLabel = stateLabels[transition.fromState] ?? startLabel
-            let toLabel = transition.toLabel
+        // Step 2: Group states by matching signatures
+        // First pass: group by exact signature match
+        var signatureGroups: [RoomSignature: Set<String>] = [:]
+        for (state, signature) in stateSignatures {
+            // Check if this signature matches any existing group
+            var foundMatch = false
+            for (existingSig, states) in signatureGroups {
+                if signature.matches(existingSig) {
+                    signatureGroups[existingSig]?.insert(state)
+                    foundMatch = true
+                    break
+                }
+            }
+            if !foundMatch {
+                signatureGroups[signature] = [state]
+            }
+        }
+        
+        // Step 2.5: Merge groups with equivalent signatures
+        // (same label and connection pattern but different canonical paths)
+        var mergedGroups: [RoomSignature: Set<String>] = [:]
+        var processedSignatures = Set<RoomSignature>()
+        
+        for (sig1, states1) in signatureGroups {
+            if processedSignatures.contains(sig1) { continue }
             
-            guard let fromRoomId = labelToRoomId[fromLabel],
-                  let toRoomId = labelToRoomId[toLabel] else { continue }
+            var mergedStates = states1
+            processedSignatures.insert(sig1)
+            
+            // Find all signatures that should be merged with this one
+            for (sig2, states2) in signatureGroups {
+                if sig1 != sig2 && !processedSignatures.contains(sig2) && sig1.matches(sig2) {
+                    mergedStates.formUnion(states2)
+                    processedSignatures.insert(sig2)
+                }
+            }
+            
+            mergedGroups[sig1] = mergedStates
+        }
+        signatureGroups = mergedGroups
+        
+        // Step 3: Create rooms from signature groups
+        var rooms: [Room] = []
+        var signatureToRoomId: [RoomSignature: Int] = [:]
+        var roomIdCounter = 0
+        
+        for (signature, states) in signatureGroups {
+            let room = Room(id: roomIdCounter, label: signature.label, states: states)
+            rooms.append(room)
+            signatureToRoomId[signature] = roomIdCounter
+            roomIdCounter += 1
+        }
+        
+        // Step 4: Map state to room ID for easy lookup
+        var stateToRoomId: [String: Int] = [:]
+        for (signature, states) in signatureGroups {
+            if let roomId = signatureToRoomId[signature] {
+                for state in states {
+                    stateToRoomId[state] = roomId
+                }
+            }
+        }
+        
+        // Step 5: Map ALL transitions to room connections
+        for transition in transitions {
+            guard let fromRoomId = stateToRoomId[transition.fromState],
+                  let toSignature = stateSignatures[transition.toState],
+                  let toRoomId = signatureToRoomId[toSignature] else { continue }
             
             // Store this connection (may override previous)
             if transition.fromState == "" || rooms[fromRoomId].doors[transition.door] == nil {
@@ -165,27 +258,26 @@ public class StateTransitionAnalyzer {
             }
         }
         
-        // Step 2: Identify self-loops from single-door explorations
+        // Step 6: Identify self-loops from single-door explorations
         for path in exploredPaths where path.count == 1 {
             let labels = getLabelsForPath(path)
             if labels.count == 2 && labels[0] == labels[1] {
                 // Self-loop detected
                 if let door = Int(path),
-                   let roomId = labelToRoomId[labels[0]] {
+                   let roomId = stateToRoomId[""] {  // Start state room ID
                     rooms[roomId].doors[door] = (toRoomId: roomId, toDoor: door)
                 }
             }
         }
         
-        // Step 3: Find ALL bidirectional connections from transitions
+        // Step 7: Find ALL bidirectional connections from transitions
         // Look for transitions that form cycles back to start
         for trans in transitions {
             if trans.toState == "" && trans.fromState.count == 1 {
                 // This is a return to start from a single-door state
                 if let door1 = Int(trans.fromState), // The door we took to get to this state
-                   let room0Id = labelToRoomId[startLabel],
-                   let room1Label = stateLabels[trans.fromState],
-                   let room1Id = labelToRoomId[room1Label] {
+                   let room0Id = stateToRoomId[""],
+                   let room1Id = stateToRoomId[trans.fromState] {
                     let door2 = trans.door  // The door that returns us
                     // We found: start --door1--> state --door2--> start
                     // This means room0:door1 connects to room1:door2
@@ -198,37 +290,47 @@ public class StateTransitionAnalyzer {
         // Also check exploredPaths for 2-char return paths
         for path in exploredPaths where path.count == 2 {
             let labels = getLabelsForPath(path)
-            if labels.count == 3 && labels[0] == labels[2] && labels[0] != labels[1] {
-                // This is a return path: A -> B -> A
+            if labels.count == 3 && labels[0] == labels[2] {
+                // This is a potential return path
                 let door1Char = path[path.index(path.startIndex, offsetBy: 0)]
                 let door2Char = path[path.index(path.startIndex, offsetBy: 1)]
                 
                 if let door1 = Int(String(door1Char)),
-                   let door2 = Int(String(door2Char)),
-                   let room0Id = labelToRoomId[labels[0]],
-                   let room1Id = labelToRoomId[labels[1]] {
-                    // Door1 from room0 goes to room1, door2 returns
-                    rooms[room0Id].doors[door1] = (toRoomId: room1Id, toDoor: door2)
-                    rooms[room1Id].doors[door2] = (toRoomId: room0Id, toDoor: door1)
+                   let door2 = Int(String(door2Char)) {
+                    // Get the room IDs for each state in the path
+                    let state0 = ""  // Start
+                    let state1 = String(door1Char)  // After first door
+                    let state2 = path  // After both doors
+                    
+                    if let room0Id = stateToRoomId[state0],
+                       let room1Id = stateToRoomId[state1] {
+                        // Check if we returned to the same room (not just same label)
+                        if let room2Id = stateToRoomId[state2], room2Id == room0Id {
+                            // Door1 from room0 goes to room1, door2 returns
+                            rooms[room0Id].doors[door1] = (toRoomId: room1Id, toDoor: door2)
+                            rooms[room1Id].doors[door2] = (toRoomId: room0Id, toDoor: door1)
+                        }
+                    }
                 }
             }
         }
         
-        // Step 4: Process 3-door paths for additional connections
+        // Step 8: Process 3-door paths for additional connections
         for path in exploredPaths where path.count == 3 {
-            let labels = getLabelsForPath(path)
-            if labels.count == 4 {
-                for i in 0..<3 {
-                    let doorChar = path[path.index(path.startIndex, offsetBy: i)]
-                    if let door = Int(String(doorChar)),
-                       let fromRoomId = labelToRoomId[labels[i]],
-                       let toRoomId = labelToRoomId[labels[i+1]] {
-                        // Add connection if not already mapped
-                        if rooms[fromRoomId].doors[door] == nil {
-                            rooms[fromRoomId].doors[door] = (toRoomId: toRoomId, toDoor: nil)
-                        }
+            var currentState = ""
+            for i in 0..<3 {
+                let doorChar = path[path.index(path.startIndex, offsetBy: i)]
+                let nextState = currentState + String(doorChar)
+                
+                if let door = Int(String(doorChar)),
+                   let fromRoomId = stateToRoomId[currentState],
+                   let toRoomId = stateToRoomId[nextState] {
+                    // Add connection if not already mapped
+                    if rooms[fromRoomId].doors[door] == nil {
+                        rooms[fromRoomId].doors[door] = (toRoomId: toRoomId, toDoor: nil)
                     }
                 }
+                currentState = nextState
             }
         }
         
@@ -255,6 +357,87 @@ public class StateTransitionAnalyzer {
         }
         
         return rooms
+    }
+    
+    /// Build a signature for a state based on its connection pattern
+    private func buildSignatureForState(_ state: String, label: Int) -> RoomSignature {
+        var selfLoops = Set<Int>()
+        var connectionPatterns = Set<RoomSignature.ConnectionPattern>()
+        
+        // Find canonical path for this state
+        let canonicalPath = findCanonicalPath(state)
+        
+        // Check all 6 doors from this state
+        for door in 0..<6 {
+            let nextState = state + String(door)
+            
+            // Check if we have explored this transition
+            if let nextLabel = stateLabels[nextState] {
+                if nextLabel == label && isReturnPath(from: state, via: door, to: nextState) {
+                    // This is a self-loop
+                    selfLoops.insert(door)
+                } else {
+                    // Transition to another room (might have same label)
+                    connectionPatterns.insert(RoomSignature.ConnectionPattern(door: door, targetLabel: nextLabel))
+                }
+            }
+        }
+        
+        return RoomSignature(
+            label: label,
+            selfLoops: selfLoops,
+            transitions: connectionPatterns,
+            canonicalPath: canonicalPath
+        )
+    }
+    
+    /// Find the canonical (shortest) path to reach this state
+    private func findCanonicalPath(_ state: String) -> String {
+        // If this is a state we've seen that returns to start, find the cycle
+        var visited = Set<String>()
+        var queue: [(state: String, path: String)] = [("", "")]
+        
+        while !queue.isEmpty {
+            let (currentState, currentPath) = queue.removeFirst()
+            
+            if currentState == state {
+                return currentPath
+            }
+            
+            if visited.contains(currentState) {
+                continue
+            }
+            visited.insert(currentState)
+            
+            // Try all doors
+            for door in 0..<6 {
+                let nextState = currentState + String(door)
+                if stateLabels[nextState] != nil {
+                    queue.append((nextState, currentPath + String(door)))
+                }
+            }
+        }
+        
+        // If BFS doesn't find it, return the state itself as canonical
+        return state
+    }
+    
+    /// Check if a transition is a self-loop (returns to the same room)
+    private func isReturnPath(from: String, via door: Int, to: String) -> Bool {
+        // Check if going through door from 'to' state returns to 'from'
+        for returnDoor in 0..<6 {
+            let returnState = to + String(returnDoor)
+            if returnState == from {
+                return true
+            }
+            // Check if we have a transition that shows this is a return
+            for trans in transitions {
+                if trans.fromState == to && trans.door == returnDoor && trans.toState == from {
+                    return true
+                }
+            }
+        }
+        return false
     }
     
     /// Get labels for a given path

@@ -147,6 +147,8 @@ struct CountLines: AsyncParsableCommand {
                 TestDisconnected.test()
             case "ExperimentalTests":
                 await ExperimentalTests.run()
+            case "TestSixRooms":
+                await TestSixRooms.run()
             default:
                 print("Unknown worker: \(workerName)")
                 print("Available workers:")
