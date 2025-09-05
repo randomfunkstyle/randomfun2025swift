@@ -75,13 +75,17 @@ public struct MapDescription: Codable {
     }
 }
 
-public struct Connection: Codable {
+public struct Connection: Codable, CustomStringConvertible {
     public let from: RoomDoor
     public let to: RoomDoor
     
     public init(from: RoomDoor, to: RoomDoor) {
         self.from = from
         self.to = to
+    }
+
+    public var description: String {
+        return "Connection(\(from.room).\(from.door), -> \(to.room).\(to.door))"
     }
 }
 

@@ -27,7 +27,7 @@ public class Worker {
             let explored = try await client.explore(plans: plans)
 
             processExplored(explored: explored)
-            print("Explored: \(explored.results)")
+            print("Explored: [\(explored.queryCount)] \(explored.results) ")
         }
 
         let guess = generateGuess()
