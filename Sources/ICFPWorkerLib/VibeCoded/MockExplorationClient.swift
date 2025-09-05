@@ -35,6 +35,12 @@ public class MockExplorationClient: ExplorationClient {
     
     private func setupThreeRooms() {
         correctMap = Self.generateThreeRooms()
+        roomLabels = correctMap!.rooms
+        roomConnections = [:]
+        for connection in correctMap!.connections {
+            roomConnections[connection.from.room, default: [:]][connection.from.door] = connection.to.room
+            roomConnections[connection.to.room, default: [:]][connection.to.door] = connection.from.room
+        }
     }
     
     static func generateThreeRooms(offset: Int = 0) -> MapDescription {
