@@ -13,14 +13,65 @@ public class MockExplorationClient: ExplorationClient {
     /// Track number of exploration queries (for testing efficiency)
     private var queryCount: Int = 0
     /// The correct map structure for validation
-    private var correctMap: MapDescription?
+    internal private(set) var correctMap: MapDescription?
+    
+    
+    public enum RoomLayout {
+        case hexagon
+        case threeRooms
+    }
     
     /// Initialize with optional simple hexagon structure
     /// - Parameter simpleHexagon: If true, creates a 6-room hexagonal graph
-    public init(simpleHexagon: Bool = true) {
-        if simpleHexagon {
+    
+    public init(layout: RoomLayout = .hexagon) {
+        switch layout {
+        case .hexagon:
             setupSimpleHexagon()
+        case .threeRooms:
+            setupThreeRooms()
         }
+    }
+    
+    private func setupThreeRooms() {
+        correctMap = Self.generateThreeRooms()
+    }
+    
+    static func generateThreeRooms(offset: Int = 0) -> MapDescription {
+        var roomLabels = [0, 1, 2]
+        
+        func idx(_ i: Int) -> Int {
+            return (i + offset) % roomLabels.count
+        }
+        
+        roomLabels[idx(0)] = 0
+        roomLabels[idx(1)] = 1
+        roomLabels[idx(2)] = 2
+        
+        var connections: [Connection] = []
+        connections.connect(room: idx(0), door: 0, toRoom: idx(0), toDoor: 0)
+        connections.connect(room: idx(0), door: 1, toRoom: idx(0), toDoor: 1)
+        connections.connect(room: idx(0), door: 2, toRoom: idx(0), toDoor: 2)
+        connections.connect(room: idx(0), door: 3, toRoom: idx(0), toDoor: 3)
+        connections.connect(room: idx(0), door: 4, toRoom: idx(0), toDoor: 4)
+        connections.connect(room: idx(0), door: 5, toRoom: idx(1), toDoor: 0)
+        
+        // connections.connect(room: idx(1), door: 0, toRoom: idx(0), toDoor: 5)
+        connections.connect(room: idx(1), door: 1, toRoom: idx(1), toDoor: 1)
+        connections.connect(room: idx(1), door: 2, toRoom: idx(1), toDoor: 2)
+        connections.connect(room: idx(1), door: 3, toRoom: idx(1), toDoor: 3)
+        connections.connect(room: idx(1), door: 4, toRoom: idx(1), toDoor: 4)
+        connections.connect(room: idx(1), door: 5, toRoom: idx(2), toDoor: 0)
+        
+        
+        // connections.connect(room: idx(2), door: 0, toRoom: idx(1), toDoor: 5)
+        connections.connect(room: idx(2), door: 1, toRoom: idx(2), toDoor: 1)
+        connections.connect(room: idx(2), door: 2, toRoom: idx(2), toDoor: 2)
+        connections.connect(room: idx(2), door: 3, toRoom: idx(2), toDoor: 3)
+        connections.connect(room: idx(2), door: 4, toRoom: idx(2), toDoor: 4)
+        connections.connect(room: idx(2), door: 5, toRoom: idx(2), toDoor: 5)
+        
+        return MapDescription(rooms: roomLabels, startingRoom: idx(0), connections: connections)
     }
     
     /// Simulate problem selection
@@ -129,13 +180,74 @@ public class MockExplorationClient: ExplorationClient {
         return GuessResponse(correct: false)
     }
     
-    private func mapsAreEquivalent(map1: MapDescription, map2: MapDescription) -> Bool {
+    
+    func mapsAreEquivalent(map1: MapDescription, map2: MapDescription) -> Bool {
         guard map1.rooms.count == map2.rooms.count else { return false }
         
-        let sortedRooms1 = map1.rooms.sorted()
-        let sortedRooms2 = map2.rooms.sorted()
+        var roomsMappingBetweenMaps: [Int: Int] = [:]
+        roomsMappingBetweenMaps[map1.startingRoom] = map2.startingRoom
         
-        return sortedRooms1 == sortedRooms2
+        var indexesToCheck = (0..<map1.rooms.count).map { $0 }
+        
+        while indexesToCheck.count > 0 {
+            
+            // Find first index for which we have mapping
+            let idx = indexesToCheck.first { roomsMappingBetweenMaps[$0] != nil }
+            guard let idx = idx else {
+                print("No more indexes with mapping found, but some rooms are still unmapped.")
+                return false
+            }
+            indexesToCheck.removeAll { $0 == idx }
+            
+            let room1 = idx
+            let room2 = roomsMappingBetweenMaps[room1]!
+            
+            for door in 0...5 {
+                
+                /// Find connection for door1 in map1
+                var destinationForMap1: Int?
+                if let connection1 = map1.connections.first(where: { $0.from.room == room1 && $0.from.door == door }) {
+                    destinationForMap1 = connection1.to.room
+                } else if let connection1 = map1.connections.first(where: { $0.to.room == room1 && $0.to.door == door }) {
+                    destinationForMap1 = connection1.from.room
+                } else {
+                    print("No connection found for door \(door) in room \(room1)")
+                    return false
+                }
+                
+                var destinationForMap2: Int?
+                if let connection2 = map2.connections.first(where: { $0.from.room == room2 && $0.from.door == door }) {
+                    destinationForMap2 = connection2.to.room
+                } else if let connection2 = map2.connections.first(where: { $0.to.room == room2 && $0.to.door == door }) {
+                    destinationForMap2 = connection2.from.room
+                }  else {
+                    print("No connection found for door \(door) in room \(room2)")
+                    return false
+                }
+                
+                let indexOfMap1 = destinationForMap1!
+                let indexOfMap2 = destinationForMap2!
+                
+                if let existingIndex = roomsMappingBetweenMaps[indexOfMap1] {
+                    if existingIndex != indexOfMap2 {
+                        print("Room \(indexOfMap1) in map1 is not the same as room \(indexOfMap2) in map2")
+                        return false
+                    }
+                } else {
+                    roomsMappingBetweenMaps[indexOfMap1] = indexOfMap2
+                }
+                
+                let label1 = map1.rooms[indexOfMap1]
+                let label2 = map2.rooms[indexOfMap2]
+                
+                guard label1 == label2 else {
+                    print("Labels do not match for rooms \(indexOfMap1) and \(indexOfMap2): \(label1) vs \(label2)")
+                    return false
+                }
+            }
+            
+        }
+        return true
     }
 }
 

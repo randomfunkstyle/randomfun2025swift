@@ -94,3 +94,10 @@ public struct RoomDoor: Codable {
         self.door = door
     }
 }
+
+
+public extension  Array where Element == Connection {
+    mutating func connect(room: Int, door: Int, toRoom: Int, toDoor: Int) {
+        self.append(Connection(from: RoomDoor(room: room, door: door), to: RoomDoor(room: toRoom, door: toDoor)))
+    }
+}

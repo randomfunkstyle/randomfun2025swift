@@ -17,7 +17,7 @@ struct CountLines: AsyncParsableCommand {
             
             switch workerName {
             case "BasicWorker":
-                try await  BasicWorker(problem: .probatio, client: MockExplorationClient()).run()
+                try await  BasicWorker(problem: .probatio, client: MockExplorationClient(layout: .threeRooms)).run()
             default:
                 print("Unknown worker: \(workerName)")
             }

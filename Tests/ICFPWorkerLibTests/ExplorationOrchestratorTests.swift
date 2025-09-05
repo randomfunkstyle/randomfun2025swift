@@ -4,7 +4,7 @@ import XCTest
 final class ExplorationOrchestratorTests: XCTestCase {
     
     func testOrchestratorWithSimpleHexagon() async throws {
-        let mockClient = MockExplorationClient(simpleHexagon: true)
+        let mockClient = MockExplorationClient(layout: .hexagon)
         let orchestrator = ExplorationOrchestrator(
             client: mockClient,
             maxExplorations: 50,
