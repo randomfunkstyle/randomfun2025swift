@@ -24,6 +24,7 @@ public class MockExplorationClient: ExplorationClient {
         case threeRoomsThreeSelfLoops
         case threeRoomsFourSelfLoops
         case threeRoomsFiveSelfLoops
+        case fromFile(String)  // Load from a map file
     }
 
     /// Initialize with optional simple hexagon structure
@@ -49,7 +50,77 @@ public class MockExplorationClient: ExplorationClient {
             setupThreeRoomsFourSelfLoops()
         case .threeRoomsFiveSelfLoops:
             setupThreeRoomsFiveSelfLoops()
+        case .fromFile(let filename):
+            setupFromFile(filename)
         }
+    }
+    
+    private func setupFromFile(_ filename: String) {
+        do {
+            let config = try MapFileLoader.loadMap(from: filename)
+            
+            // Set room labels
+            roomLabels = config.roomLabels
+            
+            // Build connections dictionary
+            for (i, roomId) in config.roomIds.enumerated() {
+                roomConnections[i] = [:]
+            }
+            
+            // Map room IDs to indices
+            let roomIdToIndex = Dictionary(uniqueKeysWithValues: config.roomIds.enumerated().map { ($1, $0) })
+            
+            // Process connections
+            for conn in config.connections {
+                if let fromIndex = roomIdToIndex[conn.from],
+                   let toIndex = roomIdToIndex[conn.to] {
+                    roomConnections[fromIndex]?[conn.fromDoor] = toIndex
+                }
+            }
+            
+            // Build correct map for validation
+            let startIndex = roomIdToIndex[config.startRoom] ?? 0
+            correctMap = buildMapDescription(startingRoom: startIndex)
+            
+        } catch {
+            print("Error loading map from file \(filename): \(error)")
+            // Fallback to simple hexagon
+            setupSimpleHexagon()
+        }
+    }
+    
+    private func buildMapDescription(startingRoom: Int) -> MapDescription {
+        var connections: [Connection] = []
+        var processedPairs = Set<String>()
+        
+        for (fromRoom, doors) in roomConnections {
+            for (fromDoor, toRoom) in doors {
+                // Find the return door
+                var toDoor = fromDoor  // Default to same door
+                if let targetDoors = roomConnections[toRoom] {
+                    for (targetDoor, targetRoom) in targetDoors {
+                        if targetRoom == fromRoom && fromDoor == targetDoor {
+                            toDoor = targetDoor
+                            break
+                        }
+                    }
+                }
+                
+                // Create unique key for this connection
+                let key = fromRoom < toRoom ? "\(fromRoom):\(fromDoor)-\(toRoom):\(toDoor)" : 
+                                              "\(toRoom):\(toDoor)-\(fromRoom):\(fromDoor)"
+                
+                if !processedPairs.contains(key) {
+                    processedPairs.insert(key)
+                    connections.append(Connection(
+                        from: RoomDoor(room: fromRoom, door: fromDoor),
+                        to: RoomDoor(room: toRoom, door: toDoor)
+                    ))
+                }
+            }
+        }
+        
+        return MapDescription(rooms: roomLabels, startingRoom: startingRoom, connections: connections)
     }
 
     private func setupThreeRooms() {
