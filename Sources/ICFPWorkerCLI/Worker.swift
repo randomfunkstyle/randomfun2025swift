@@ -15,8 +15,9 @@ struct CountLines: AsyncParsableCommand {
 
             let workerName = input
 
-            let problemName: String? = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : nil
-            let problem: Problem? = problemName.map { Problem.fromName(name: $0) } 
+            let problemName: String? =
+                CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : nil
+            let problem: Problem? = problemName.map { Problem.fromName(name: $0) }
 
             switch workerName {
             case "BasicWorker":
@@ -31,7 +32,8 @@ struct CountLines: AsyncParsableCommand {
             case "DeBruijnWorker":
                 if #available(macOS 13.0, *) {
                     try await DeBruijnWorker(
-                        problem: problem ?? .probatio, client: MockExplorationClient(layout: .threeRooms)
+                        problem: problem ?? .probatio,
+                        client: MockExplorationClient(layout: .threeRooms)
                     ).run()
                     //                    try await DeBruijnWorker(problem: .probatio, client: HTTPExplorationClient()).run()
                 }
@@ -40,31 +42,41 @@ struct CountLines: AsyncParsableCommand {
                 if #available(macOS 13.0, *) {
                     //                    try await  FindEverythingWorker(problem: .primus, client: MockExplorationClient(layout: .hexagon), debug: true).run()
                     try await FindEverythingWorker(
-                        problem: problem ?? .secundus, client: HTTPExplorationClient(), depth: 5, take: 10
+                        problem: problem ?? .secundus, client: HTTPExplorationClient(), depth: 5,
+                        take: 10
                     ).run()
                 }
-                
+
             case "Ping":
                 if #available(macOS 13.0, *) {
                     //                    try await  PingWorker(problem: .primus, client: MockExplorationClient(layout: .hexagon), debug: true).run()
                     try await PingWorker(
-                        problem: problem ?? .aleph, client: HTTPExplorationClient(), depth: 5, take: 5
+                        problem: problem ?? .aleph, client: HTTPExplorationClient(), depth: 5,
+                        take: 5
                     ).run()
                 }
-
             case "Grid":
                 for depth in 1...5 {
                     for take in 5...15 {
                         print("Running with depth \(depth) and take \(take)")
                         if #available(macOS 13.0, *) {
                             try await FindEverythingWorker(
-                                problem: problem ?? .aleph, client: HTTPExplorationClient(), depth: depth,
+                                problem: problem ?? .aleph, client: HTTPExplorationClient(),
+                                depth: depth,
                                 take: take
                             ).run()
                         }
                     }
                 }
 
+                try await GenerateEverythingWorker(
+                    problem: .probatio, client: MockExplorationClient(layout: .threeRooms)
+                ).run()
+            //                try await  GenerateEverythingWorker(problem: .probatio, client: HTTPExplorationClient()).run()
+            case "NaiveWorker":
+                try await NaiveWorker(
+                    problem: problem, client: MockExplorationClient(layout: .threeRooms)
+                ).run()
             default:
                 print("Unknown worker: \(workerName)")
             }
