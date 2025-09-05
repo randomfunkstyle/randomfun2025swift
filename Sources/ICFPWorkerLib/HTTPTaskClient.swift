@@ -49,10 +49,22 @@ public class HTTPTaskClient {
         guard let httpResponse = response as? HTTPURLResponse,
             httpResponse.statusCode == 200
         else {
-            throw URLError(.badServerResponse)
+            throw HTTPError(
+                statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                message: String(data: data, encoding: .utf8) ?? "Unknown error"
+        )
         }
 
         let decoder = JSONDecoder()
         return try decoder.decode(R.self, from: data)
+    }
+}
+
+struct HTTPError: Error, LocalizedError {
+    let statusCode: Int
+    let message: String
+
+    var errorDescription: String? {
+        return "HTTP Error \(statusCode): \(message)"
     }
 }
