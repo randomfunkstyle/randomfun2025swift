@@ -1,20 +1,48 @@
 import Foundation
-import FoundationNetworking
+
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 public class HTTPTaskClient {
     private let baseURL: String
+    private let teamId: String
 
-    public init(url: String) {
-        self.baseURL = url
+    public init(config: EnvConfig) {
+        self.baseURL = config.apiUrl
+        self.teamId = config.teamId
     }
 
-    public func getTask(id taskId: String) async throws -> Task {
-        if let cachedTask = try? loadTask(id: taskId) {
-            return cachedTask
-        }
+    // MARK: - API Methods
+    public func register(name: String, pl: String, email: String) async throws -> RegisterResponse {
+        let request = RegisterRequest(name: name, pl: pl, email: email)
+        return try await post(endpoint: "/register", body: request)
+    }
 
-        let url = URL(string: "\(baseURL)/\(taskId)")!
-        let request = URLRequest(url: url)
+    public func selectProblem(problemName: String) async throws -> SelectResponse {
+        let request = SelectRequest(id: self.teamId, problemName: problemName)
+        return try await post(endpoint: "/select", body: request)
+    }
+
+    public func explore(plans: [String]) async throws -> ExploreResponse {
+        let request = ExploreRequest(id: self.teamId, plans: plans)
+        return try await post(endpoint: "/explore", body: request)
+    }
+
+    public func guess(map: MapDescription) async throws -> GuessResponse {
+        let request = GuessRequest(id: self.teamId, map: map)
+        return try await post(endpoint: "/guess", body: request)
+    }
+
+    // MARK: - Private Helper Methods
+    private func post<T: Codable, R: Codable>(endpoint: String, body: T) async throws -> R {
+        let url = URL(string: "\(baseURL)\(endpoint)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -24,36 +52,7 @@ public class HTTPTaskClient {
             throw URLError(.badServerResponse)
         }
 
-        let task = try JSONDecoder().decode(Task.self, from: data)
-
-        try storeTask(task)
-
-        return task
-    }
-
-    private func storeTask(_ task: Task) throws {
-        let fileManager = FileManager.default
-        let tasksDir = URL(fileURLWithPath: "tasks")
-
-        if !fileManager.fileExists(atPath: tasksDir.path) {
-            try fileManager.createDirectory(at: tasksDir, withIntermediateDirectories: true)
-        }
-
-        let fileName = "\(task.id).json"
-        let fileURL = tasksDir.appendingPathComponent(fileName)
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        let jsonData = try encoder.encode(task)
-
-        try jsonData.write(to: fileURL)
-    }
-
-    private func loadTask(id taskId: String) throws -> Task {
-        let fileName = "\(taskId).json"
-        let fileURL = URL(fileURLWithPath: "tasks").appendingPathComponent(fileName)
-
-        let jsonData = try Data(contentsOf: fileURL)
-        return try JSONDecoder().decode(Task.self, from: jsonData)
+        let decoder = JSONDecoder()
+        return try decoder.decode(R.self, from: data)
     }
 }

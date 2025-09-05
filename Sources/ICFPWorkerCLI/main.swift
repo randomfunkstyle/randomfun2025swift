@@ -2,10 +2,8 @@ import ArgumentParser
 import Foundation
 import ICFPWorkerLib
 
-@main
-@available(macOS 10.15, Windows 10.0, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 struct CountLines: AsyncParsableCommand {
-    mutating func run() async throws {
+    func run() async throws {
         print("🚀 ICFP Worker CLI")
         print("==================")
 
@@ -31,11 +29,15 @@ struct CountLines: AsyncParsableCommand {
             print("Valid: \(worker.validate(input))")
         }
 
-        // let client = HTTPTaskClient(url: "http://localhost:8000")
-        // let task = try await client.getTask(id: "task001")
-        // print("\nFetched Task:")
-        // print("ID: \(task.id)")
-
-        print("\n✅ ICFP Worker completed successfully!")
+//         let config = EnvConfig()
+//         let client = HTTPTaskClient(config: config)
+//         let selected = try await client.selectProblem(problemName: "probatio")
+//         print("Select problem result: \(selected.problemName)")
+//
+//        print("\n✅ ICFP Worker completed successfully!")
     }
+}
+
+if #available(macOS 12.0, *) {
+    try await CountLines().run()
 }
