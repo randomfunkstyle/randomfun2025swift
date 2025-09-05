@@ -42,11 +42,13 @@ public class IncrementalRoomBuilder {
         // validateAndSplitRooms()  // Commenting out aggressive splitting
         
         // Debug: print current room configuration
-        if false {  // Set to true for debugging
+        let debug = false  // Set to true for debugging
+        if debug {
             print("\n🔍 DEBUG - Current rooms after processing:")
             for room in roomCandidates {
                 print("  Room \(room.id) (label \(room.label)): \(room.states.count) states")
-                print("    Signature: \(room.connectionSignature)")
+                let neighbors = getNeighborLabels(from: room.connectionSignature, myLabel: room.label)
+                print("    Neighbors: \(neighbors)")
             }
         }
     }
@@ -438,50 +440,57 @@ public class IncrementalRoomBuilder {
         
         for (index, room) in roomCandidates.enumerated() {
             if room.states.count > 1 {
-                // Only split if we have substantial information
-                var stateSignatures: [String: [String]] = [:]
+                // Group states by their full door-to-label mapping
+                var stateGroups: [String: [String]] = [:]
                 
                 for state in room.states {
-                    // Build a signature based on which doors lead to which labels
-                    var doorToLabel: [(Int, Int)] = []
+                    // Build complete door mapping
+                    var doorMap: [Int: Int] = [:]
+                    var unknownDoors = 0
                     
                     for door in 0..<6 {
                         let nextState = state + String(door)
                         if let nextLabel = stateLabels[nextState] {
-                            doorToLabel.append((door, nextLabel))
+                            doorMap[door] = nextLabel
+                        } else {
+                            unknownDoors += 1
                         }
                     }
                     
-                    // Only consider states with at least 2 known transitions
-                    let nonSelfLoops = doorToLabel.filter { $0.1 != room.label }
-                    if nonSelfLoops.count >= 2 {
-                        // Create signature from non-self-loop transitions
-                        let sig = nonSelfLoops.sorted { $0.0 < $1.0 }
-                            .map { "\($0.0)→\($0.1)" }
+                    // Only split if we have enough information (at least 4 doors mapped)
+                    if doorMap.count >= 4 {
+                        // Create signature from complete door mapping
+                        let sig = doorMap.sorted { $0.key < $1.key }
+                            .map { "d\($0.key)→\($0.value)" }
                             .joined(separator: ",")
-                        stateSignatures[sig, default: []].append(state)
+                        stateGroups[sig, default: []].append(state)
                     } else {
-                        // Not enough information - keep in original group
-                        stateSignatures["unknown", default: []].append(state)
+                        // Not enough info - don't split this state
+                        stateGroups["partial_\(unknownDoors)", default: []].append(state)
                     }
                 }
                 
-                // Only split if we have clear distinct patterns
-                let knownGroups = stateSignatures.filter { $0.key != "unknown" }
-                if knownGroups.count > 1 {
-                    // We have multiple distinct patterns
-                    var groups: [[String]] = Array(knownGroups.values)
-                    
-                    // Add unknown states to the largest group
-                    if let unknownStates = stateSignatures["unknown"], !unknownStates.isEmpty {
-                        if var largestGroup = groups.max(by: { $0.count < $1.count }) {
-                            largestGroup.append(contentsOf: unknownStates)
-                        } else {
-                            groups.append(unknownStates)
+                // Only split if we have truly distinct complete patterns
+                let completeGroups = stateGroups.filter { !$0.key.starts(with: "partial_") }
+                if completeGroups.count > 1 {
+                    // Check if the patterns are actually different
+                    let patterns = completeGroups.keys.map { $0 }
+                    if patterns.count > 1 {
+                        var groups: [[String]] = Array(completeGroups.values)
+                        
+                        // Add partial states to the largest complete group
+                        let partialStates = stateGroups.filter { $0.key.starts(with: "partial_") }
+                            .flatMap { $0.value }
+                        
+                        if !partialStates.isEmpty {
+                            // Find the largest group and add partial states to it
+                            if let largestIndex = groups.indices.max(by: { groups[$0].count < groups[$1].count }) {
+                                groups[largestIndex].append(contentsOf: partialStates)
+                            }
                         }
+                        
+                        roomsToSplit.append((index: index, groups: groups))
                     }
-                    
-                    roomsToSplit.append((index: index, groups: groups))
                 }
             }
         }
