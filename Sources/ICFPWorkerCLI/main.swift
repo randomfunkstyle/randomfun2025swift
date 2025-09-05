@@ -29,13 +29,15 @@ struct CountLines: AsyncParsableCommand {
             print("Valid: \(worker.validate(input))")
         }
 
-         let config = EnvConfig()
-         let client = HTTPTaskClient(config: config)
-         let selected = try await client.selectProblem(problemName: "probatio")
-         print("Select problem result: \(selected.problemName)")
-
-        print("\n✅ ICFP Worker completed successfully!")
+//         let config = EnvConfig()
+//         let client = HTTPTaskClient(config: config)
+//         let selected = try await client.selectProblem(problemName: "probatio")
+//         print("Select problem result: \(selected.problemName)")
+//
+//        print("\n✅ ICFP Worker completed successfully!")
     }
 }
 
-try await CountLines().run()
+if #available(macOS 12.0, *) {
+    try await CountLines().run()
+}
