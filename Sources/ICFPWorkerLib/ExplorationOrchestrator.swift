@@ -1,0 +1,249 @@
+import Foundation
+
+/// Main coordinator for the exploration pipeline
+/// Orchestrates path generation, exploration, evaluation, and prediction
+public class ExplorationOrchestrator {
+    /// Client for API communication
+    private let client: ExplorationClient
+    /// Generates exploration paths
+    private let pathGenerator: PathGenerator
+    /// Maintains the discovered graph
+    private let graphBuilder: GraphBuilder
+    /// Evaluates graph completeness
+    private let evaluator: GraphEvaluator
+    /// Predicts next best paths
+    private let predictor: NextStepPredictor
+    
+    /// Number of exploration API calls made
+    private var explorationCount: Int = 0
+    /// Maximum allowed exploration attempts
+    private let maxExplorations: Int
+    /// Confidence level required to consider graph complete
+    private let confidenceThreshold: Double
+    
+    /// Final result of the exploration process
+    public struct ExplorationResult {
+        /// Whether the map was successfully discovered
+        public let success: Bool
+        /// Total number of exploration queries used
+        public let explorationCount: Int
+        /// The final map (may be partial if failed)
+        public let finalMap: MapDescription?
+        /// Confidence in the final map
+        public let confidence: Double
+    }
+    
+    public init(
+        client: ExplorationClient,
+        pathGenerator: PathGenerator? = nil,
+        startingRoomLabel: Int? = nil,
+        maxExplorations: Int = 100,
+        confidenceThreshold: Double = 0.95
+    ) {
+        self.client = client
+        self.pathGenerator = pathGenerator ?? PathGenerator(maxPathLength: 10, maxPaths: 20)
+        self.graphBuilder = GraphBuilder(startingRoomLabel: startingRoomLabel)
+        self.evaluator = GraphEvaluator()
+        self.predictor = NextStepPredictor(maxPathLength: 10, maxSuggestions: 20)
+        self.maxExplorations = maxExplorations
+        self.confidenceThreshold = confidenceThreshold
+    }
+    
+    /// Main exploration loop - explores until map is complete or limit reached
+    /// - Returns: ExplorationResult with success status and final map
+    public func exploreAndMap() async throws -> ExplorationResult {
+        // Phase 1: Initial broad exploration
+        let initialPaths = pathGenerator.generatePaths(strategy: .basic)
+        
+        let initialResults = try await explorePaths(initialPaths)
+        processBatchResults(paths: initialPaths, results: initialResults)
+        
+        // Phase 2: Iterative refinement
+        while explorationCount < maxExplorations {
+            let evaluation = evaluator.evaluate(graph: graphBuilder)
+            
+            // Check if we're done
+            if evaluation.isComplete || evaluation.confidence >= confidenceThreshold {
+                let finalMap = graphBuilder.toMapDescription()
+                
+                // Try to submit the map
+                if let guessResult = try? await client.submitGuess(map: finalMap), guessResult.correct {
+                    return ExplorationResult(
+                        success: true,
+                        explorationCount: explorationCount,
+                        finalMap: finalMap,
+                        confidence: evaluation.confidence
+                    )
+                }
+            }
+            
+            // Generate next exploration paths
+            let nextPaths = predictor.predictNextPaths(graph: graphBuilder, evaluator: evaluator)
+            
+            if nextPaths.isEmpty {
+                // Fallback to systematic exploration if predictor has no suggestions
+                let fallbackPaths = pathGenerator.generatePaths(strategy: .systematic)
+                if fallbackPaths.isEmpty {
+                    break
+                }
+                
+                let results = try await explorePaths(fallbackPaths)
+                processBatchResults(paths: fallbackPaths, results: results)
+            } else {
+                // Explore predicted paths
+                let results = try await explorePaths(nextPaths)
+                processBatchResults(paths: nextPaths, results: results)
+            }
+            
+            // Try to merge duplicate rooms if detected
+            if shouldTryMergingRooms() {
+                attemptRoomMerging()
+            }
+        }
+        
+        let finalEvaluation = evaluator.evaluate(graph: graphBuilder)
+        let finalMap = graphBuilder.toMapDescription()
+        
+        if let guessResult = try? await client.submitGuess(map: finalMap) {
+            return ExplorationResult(
+                success: guessResult.correct,
+                explorationCount: explorationCount,
+                finalMap: finalMap,
+                confidence: finalEvaluation.confidence
+            )
+        }
+        
+        return ExplorationResult(
+            success: false,
+            explorationCount: explorationCount,
+            finalMap: finalMap,
+            confidence: finalEvaluation.confidence
+        )
+    }
+    
+    private func explorePaths(_ paths: [String]) async throws -> [[Int]] {
+        guard !paths.isEmpty else { return [] }
+        
+        let response = try await client.explore(plans: paths)
+        explorationCount += 1
+        
+        return response.results
+    }
+    
+    private func processBatchResults(paths: [String], results: [[Int]]) {
+        for (index, path) in paths.enumerated() {
+            if index < results.count {
+                let labels = results[index]
+                _ = graphBuilder.processExploration(path: path, labels: labels)
+                
+                inferConnectionsFromPath(path: path, labels: labels)
+            }
+        }
+    }
+    
+    /// Infer additional information from exploration results
+    /// Tries to deduce room labels and return connections
+    private func inferConnectionsFromPath(path: String, labels: [Int]) {
+        guard !path.isEmpty, !labels.isEmpty else { return }
+        
+        // Trace the path to build room sequence
+        var currentRoom = graphBuilder.getStartingRoom()
+        var roomSequence: [Int] = [currentRoom]
+        
+        for (_, doorChar) in path.enumerated() {
+            guard let door = Int(String(doorChar)), door >= 0 && door < 6 else { continue }
+            
+            if let room = graphBuilder.getRoom(currentRoom),
+               let connection = room.doors[door],
+               let (nextRoom, _) = connection {
+                currentRoom = nextRoom
+                roomSequence.append(currentRoom)
+            }
+        }
+        
+        if roomSequence.count == labels.count {
+            for (i, roomId) in roomSequence.enumerated() {
+                if var room = graphBuilder.getRoom(roomId), room.label == nil {
+                    room.label = labels[i]
+                }
+            }
+        }
+        
+        for i in 0..<(roomSequence.count - 1) {
+            let fromRoom = roomSequence[i]
+            let toRoom = roomSequence[i + 1]
+            
+            if i < path.count, let door = Int(String(path[path.index(path.startIndex, offsetBy: i)])) {
+                tryInferReturnConnection(from: fromRoom, door: door, to: toRoom)
+            }
+        }
+    }
+    
+    private func tryInferReturnConnection(from fromRoom: Int, door fromDoor: Int, to toRoom: Int) {
+        guard let targetRoom = graphBuilder.getRoom(toRoom) else { return }
+        
+        for (toDoor, connection) in targetRoom.doors {
+            if let (returnRoom, _) = connection, returnRoom == fromRoom {
+                graphBuilder.setConnection(from: fromRoom, door: fromDoor, to: toRoom, door: toDoor)
+                graphBuilder.setConnection(from: toRoom, door: toDoor, to: fromRoom, door: fromDoor)
+                break
+            }
+        }
+    }
+    
+    /// Check if we should attempt to merge duplicate rooms
+    /// Looks for rooms with same labels that might be the same room
+    private func shouldTryMergingRooms() -> Bool {
+        let allRooms = graphBuilder.getAllRooms()
+        
+        // Only consider merging if we have many rooms
+        guard allRooms.count > 10 else { return false }
+        
+        // Look for potential duplicates
+        for room1 in allRooms {
+            for room2 in allRooms where room1.id < room2.id {
+                // Same label is a strong indicator
+                if room1.label == room2.label && room1.label != nil {
+                    let connections1 = room1.doors.values.compactMap { $0 }
+                    let connections2 = room2.doors.values.compactMap { $0 }
+                    
+                    // Similar connection count suggests they might be the same
+                    if connections1.count == connections2.count {
+                        return true
+                    }
+                }
+            }
+        }
+        
+        return false
+    }
+    
+    private func attemptRoomMerging() {
+        let allRooms = graphBuilder.getAllRooms()
+        
+        for room1 in allRooms {
+            for room2 in allRooms where room1.id < room2.id {
+                if room1.label == room2.label && room1.label != nil {
+                    let shouldMerge = analyzeRoomsForMerging(room1: room1, room2: room2)
+                    if shouldMerge {
+                        graphBuilder.mergeRooms(room1.id, room2.id)
+                        return
+                    }
+                }
+            }
+        }
+    }
+    
+    private func analyzeRoomsForMerging(room1: GraphBuilder.Room, room2: GraphBuilder.Room) -> Bool {
+        guard room1.label == room2.label else { return false }
+        
+        let connections1 = room1.doors.values.compactMap { $0 }
+        let connections2 = room2.doors.values.compactMap { $0 }
+        
+        if abs(connections1.count - connections2.count) > 2 {
+            return false
+        }
+        
+        return true
+    }
+}
