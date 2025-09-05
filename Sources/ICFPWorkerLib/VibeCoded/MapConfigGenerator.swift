@@ -129,29 +129,45 @@ public class MapConfigGenerator {
         markdown += "\n"
         
         // Group connections by type
-        var bidirectional: [(String, Int, String)] = []
+        var bidirectionalConnections: [(from: String, fromDoor: Int, to: String, toDoor: Int)] = []
         var selfLoops: [(String, Int)] = []
+        var processedPairs: Set<String> = []
         
         for conn in config.connections {
-            if conn.from == conn.to {
+            if conn.from == conn.to && conn.fromDoor == conn.toDoor {
+                // Self-loop: same room, same door
                 selfLoops.append((conn.from, conn.fromDoor))
-            } else {
-                // Check if this is the first direction of a bidirectional connection
-                let reverse = config.connections.first {
-                    $0.from == conn.to && $0.to == conn.from && $0.fromDoor == conn.toDoor && $0.toDoor == conn.fromDoor
-                }
-                if reverse != nil && conn.from < conn.to {
-                    bidirectional.append((conn.from, conn.fromDoor, conn.to))
+            } else if conn.from != conn.to {
+                // Create a canonical key for this connection pair
+                let key = conn.from < conn.to ? 
+                    "\(conn.from):\(conn.fromDoor)-\(conn.to):\(conn.toDoor)" :
+                    "\(conn.to):\(conn.toDoor)-\(conn.from):\(conn.fromDoor)"
+                
+                if !processedPairs.contains(key) {
+                    processedPairs.insert(key)
+                    // Always store with smaller room ID first for consistent output
+                    if conn.from < conn.to {
+                        bidirectionalConnections.append((from: conn.from, fromDoor: conn.fromDoor, to: conn.to, toDoor: conn.toDoor))
+                    } else {
+                        bidirectionalConnections.append((from: conn.to, fromDoor: conn.toDoor, to: conn.from, toDoor: conn.fromDoor))
+                    }
                 }
             }
         }
         
-        // Add bidirectional connections
-        for (from, door, to) in bidirectional {
-            markdown += "    \(from) -.\(door).- \(to)\n"
+        // Add bidirectional connections to markdown
+        for conn in bidirectionalConnections.sorted(by: { $0.from < $1.from || ($0.from == $1.from && $0.to < $1.to) }) {
+            // For symmetric connections (same door on both sides), use simple notation
+            if conn.fromDoor == conn.toDoor {
+                markdown += "    \(conn.from) -.\(conn.fromDoor).- \(conn.to)\n"
+            } else {
+                // For asymmetric connections, show both doors
+                markdown += "    \(conn.from):\(conn.fromDoor) -..- \(conn.to):\(conn.toDoor)\n"
+            }
         }
         
-        if !bidirectional.isEmpty && !selfLoops.isEmpty {
+        // Add space between bidirectional and self-loops if both exist
+        if !bidirectionalConnections.isEmpty && !selfLoops.isEmpty {
             markdown += "\n"
         }
         
