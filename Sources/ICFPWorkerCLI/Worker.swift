@@ -19,6 +19,11 @@ struct CountLines: AsyncParsableCommand {
             case "BasicWorker":
                 try await  GenerateEverythingWorker(problem: .probatio, client: MockExplorationClient(layout: .threeRooms)).run()
 //                try await  GenerateEverythingWorker(problem: .probatio, client: HTTPExplorationClient()).run()
+            case "DeBruijnWorker":
+                if #available(macOS 13.0, *) {
+                    try await DeBruijnWorker(problem: .probatio, client: MockExplorationClient(layout: .threeRooms)).run()
+//                    try await DeBruijnWorker(problem: .probatio, client: HTTPExplorationClient()).run()
+                }
             default:
                 print("Unknown worker: \(workerName)")
             }
