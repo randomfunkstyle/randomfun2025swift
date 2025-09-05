@@ -17,7 +17,6 @@ graph TD
     
     A --0--> A
     B --2--> B
-    C --unused--> C
 ```
 
 ## Config
