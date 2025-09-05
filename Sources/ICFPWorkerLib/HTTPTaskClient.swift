@@ -1,5 +1,8 @@
 import Foundation
-import FoundationNetworking
+
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 public class HTTPTaskClient {
     private let baseURL: String
