@@ -20,6 +20,24 @@ class State {
         return room * doorCount + door
     }
 
+    private func breakConnections(
+        matrix: [[Bool]], fromIndex: Int, toIndex: Int
+    ) -> [[Bool]] {
+        var newMatrix = matrix
+        newMatrix[fromIndex][toIndex] = false
+        newMatrix[toIndex][fromIndex] = false
+
+        // check if the row or column is now all false
+        let rowAllFalse = !newMatrix[fromIndex].contains(true)
+        let colAllFalse = !newMatrix.map { $0[toIndex] }.contains(true)
+
+        if rowAllFalse || colAllFalse {
+            return matrix
+        }
+
+        return newMatrix
+    }
+
     func expand(roomCount: Int, doorCount: Int) {
         outcomes = [:]
         for door in 0..<doorCount {
@@ -37,8 +55,8 @@ class State {
 
                     for destDoor in 0..<doorCount {
                         let toIndex = roomIndex * doorCount + destDoor
-                        newMatrix[fromIndex][toIndex] = false
-                        newMatrix[toIndex][fromIndex] = false
+                        newMatrix = breakConnections(
+                            matrix: newMatrix, fromIndex: fromIndex, toIndex: toIndex)
                     }
                 }
 
@@ -104,12 +122,20 @@ public final class NaiveWorker: Worker {
             }
 
             states = states.flatMap { $0.outcomes[bestDoor]! }
+            printMatrix(matrix: states[0].matrix)
             print(
                 "Step \(step), states: \(states.count), entropy: \(bestEntropy), door: \(bestDoor)")
         }
 
         let anyState = states[0]
         return anyState.steps
+    }
+
+    private func printMatrix(matrix: [[Bool]]) {
+        for row in matrix {
+            let line = row.map { $0 ? "X" : "." }.joined(separator: " ")
+            print(line)
+        }
     }
 
     public override func generatePlans() -> [String] {
