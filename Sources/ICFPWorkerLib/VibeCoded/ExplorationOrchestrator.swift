@@ -145,6 +145,10 @@ public class ExplorationOrchestrator {
     }
     
     private func processBatchResults(paths: [String], results: [[Int]]) {
+        // First, detect connection patterns from single-door explorations
+        graphBuilder.detectConnectionPatterns(paths: paths, results: results)
+        
+        // Then process each path individually
         for (index, path) in paths.enumerated() {
             if index < results.count {
                 let labels = results[index]
@@ -210,21 +214,16 @@ public class ExplorationOrchestrator {
     private func shouldTryMergingRooms() -> Bool {
         let allRooms = graphBuilder.getAllRooms()
         
-        // Only consider merging if we have many rooms
-        guard allRooms.count > 10 else { return false }
+        // Check for merging even with few rooms (removed the > 10 restriction)
+        guard allRooms.count > 1 else { return false }
         
         // Look for potential duplicates
         for room1 in allRooms {
             for room2 in allRooms where room1.id < room2.id {
                 // Same label is a strong indicator
                 if room1.label == room2.label && room1.label != nil {
-                    let connections1 = room1.doors.values.compactMap { $0 }
-                    let connections2 = room2.doors.values.compactMap { $0 }
-                    
-                    // Similar connection count suggests they might be the same
-                    if connections1.count == connections2.count {
-                        return true
-                    }
+                    // Don't require exact connection count match
+                    return true
                 }
             }
         }
@@ -249,16 +248,24 @@ public class ExplorationOrchestrator {
     }
     
     private func analyzeRoomsForMerging(room1: GraphBuilder.Room, room2: GraphBuilder.Room) -> Bool {
-        guard room1.label == room2.label else { return false }
+        // If they have the same label, they're likely the same room
+        guard room1.label == room2.label, room1.label != nil else { return false }
         
+        // Check if one room has very few connections (likely a duplicate created early)
         let connections1 = room1.doors.values.compactMap { $0 }
         let connections2 = room2.doors.values.compactMap { $0 }
         
-        if abs(connections1.count - connections2.count) > 2 {
-            return false
+        // If one room has no or very few connections, it's likely a duplicate
+        if connections1.count <= 1 || connections2.count <= 1 {
+            return true
         }
         
-        return true
+        // If they have similar connection patterns, merge them
+        if abs(connections1.count - connections2.count) <= 3 {
+            return true
+        }
+        
+        return false
     }
     
     // MARK: - Worker-Compatible Methods

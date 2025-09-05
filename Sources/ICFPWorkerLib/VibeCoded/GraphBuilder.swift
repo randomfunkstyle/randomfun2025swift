@@ -67,11 +67,23 @@ public class GraphBuilder {
             rooms[currentRoom]?.label = label
         }
         
+        // Check for simple self-loop pattern
+        if path.count == 1 && labels.count == 2 && labels[0] == labels[1] {
+            if let door = Int(path) {
+                // This door is a self-loop
+                setConnection(from: currentRoom, door: door, to: currentRoom, door: door)
+                visitedRooms.append(currentRoom)
+                return visitedRooms
+            }
+        }
+        
         // Walk through the path, creating rooms as needed
         for (index, doorChar) in path.enumerated() {
             guard let door = Int(String(doorChar)), door >= 0 && door < 6 else { continue }
             
-            let nextRoom = traverseDoor(from: currentRoom, through: door)
+            // Check if this might be returning to an existing room
+            let nextLabel = (index + 1 < labels.count) ? labels[index + 1] : nil
+            let nextRoom = traverseDoorWithLabel(from: currentRoom, through: door, expectedLabel: nextLabel)
             
             // Apply label to the room we just entered
             if index + 1 < labels.count {
@@ -82,7 +94,62 @@ public class GraphBuilder {
             visitedRooms.append(currentRoom)
         }
         
+        // Check if we returned to starting room
+        if visitedRooms.count == labels.count && labels.last == labels.first {
+            // We might have returned to the starting room
+            let lastRoom = visitedRooms.last!
+            if lastRoom != startingRoom && rooms[lastRoom]?.label == rooms[startingRoom]?.label {
+                // Merge these rooms - they're the same
+                mergeRooms(startingRoom, lastRoom)
+                visitedRooms[visitedRooms.count - 1] = startingRoom
+            }
+        }
+        
         return visitedRooms
+    }
+    
+    /// Traverse a door from a room with an expected label hint
+    /// - Parameters:
+    ///   - roomId: Current room ID
+    ///   - door: Door number to traverse (0-5)
+    ///   - expectedLabel: The label we expect to find (if known)
+    /// - Returns: ID of the room reached through the door
+    private func traverseDoorWithLabel(from roomId: Int, through door: Int, expectedLabel: Int?) -> Int {
+        guard let room = rooms[roomId] else { return roomId }
+        
+        // If we already know where this door leads, go there
+        if let connection = room.doors[door], let (toRoom, _) = connection {
+            return toRoom
+        }
+        
+        // Check if we might be returning to an existing room
+        if let expectedLabel = expectedLabel {
+            // Look for existing rooms with this label
+            for (existingRoomId, existingRoom) in rooms {
+                if existingRoom.label == expectedLabel && existingRoomId != roomId {
+                    // Check if this room has an unknown connection that could lead back
+                    for (existingDoor, existingConnection) in existingRoom.doors {
+                        if existingConnection == nil || 
+                           (existingConnection?.toDoor == -1 && existingConnection?.toRoom == roomId) {
+                            // This could be our return connection
+                            rooms[roomId]?.doors[door] = (toRoom: existingRoomId, toDoor: existingDoor)
+                            rooms[existingRoomId]?.doors[existingDoor] = (toRoom: roomId, toDoor: door)
+                            return existingRoomId
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Create a new room for this unexplored door
+        let newRoomId = nextRoomId
+        nextRoomId += 1
+        rooms[newRoomId] = Room(id: newRoomId, label: expectedLabel)
+        
+        // Mark the connection (we don't know the return door yet, so use -1)
+        rooms[roomId]?.doors[door] = (toRoom: newRoomId, toDoor: -1)
+        
+        return newRoomId
     }
     
     /// Traverse a door from a room, creating a new room if needed
@@ -91,22 +158,7 @@ public class GraphBuilder {
     ///   - door: Door number to traverse (0-5)
     /// - Returns: ID of the room reached through the door
     private func traverseDoor(from roomId: Int, through door: Int) -> Int {
-        guard let room = rooms[roomId] else { return roomId }
-        
-        // If we already know where this door leads, go there
-        if let connection = room.doors[door], let (toRoom, _) = connection {
-            return toRoom
-        }
-        
-        // Create a new room for this unexplored door
-        let newRoomId = nextRoomId
-        nextRoomId += 1
-        rooms[newRoomId] = Room(id: newRoomId)
-        
-        // Mark the connection (we don't know the return door yet, so use -1)
-        rooms[roomId]?.doors[door] = (toRoom: newRoomId, toDoor: -1)
-        
-        return newRoomId
+        return traverseDoorWithLabel(from: roomId, through: door, expectedLabel: nil)
     }
     
     /// Manually set a bidirectional door connection
@@ -150,6 +202,58 @@ public class GraphBuilder {
         
         // Remove the merged room
         rooms.removeValue(forKey: room2)
+    }
+    
+    /// Detect connection patterns from multiple single-door explorations
+    /// Identifies self-loops and connections to other rooms
+    public func detectConnectionPatterns(paths: [String], results: [[Int]]) {
+        for (path, labels) in zip(paths, results) where path.count == 1 && labels.count == 2 {
+            guard let door = Int(path) else { continue }
+            
+            let fromRoomLabel = labels[0]
+            let toRoomLabel = labels[1]
+            
+            // Find the room with the starting label
+            let fromRoom = rooms.first { $0.value.label == fromRoomLabel }?.key ?? startingRoom
+            
+            if fromRoomLabel == toRoomLabel {
+                // Self-loop detected
+                setConnection(from: fromRoom, door: door, to: fromRoom, door: door)
+            } else {
+                // Connection to a different room
+                // This helps identify which doors actually lead to other rooms
+                if let existingToRoom = rooms.first(where: { $0.value.label == toRoomLabel && $0.key != fromRoom })?.key {
+                    // Connect to existing room with that label
+                    rooms[fromRoom]?.doors[door] = (toRoom: existingToRoom, toDoor: -1)
+                }
+            }
+        }
+        
+        // Also consolidate rooms with the same label after pattern detection
+        consolidateDuplicateRooms()
+    }
+    
+    /// Consolidate rooms that have the same label (likely duplicates)
+    private func consolidateDuplicateRooms() {
+        let labelGroups = Dictionary(grouping: rooms.values) { $0.label }
+        
+        for (label, group) in labelGroups where label != nil && group.count > 1 {
+            // Keep the room with the most connections
+            let sortedByConnections = group.sorted { room1, room2 in
+                let conn1 = room1.doors.values.compactMap { $0 }.count
+                let conn2 = room2.doors.values.compactMap { $0 }.count
+                return conn1 > conn2
+            }
+            
+            guard let primary = sortedByConnections.first else { continue }
+            
+            // Merge all others into the primary
+            for secondary in sortedByConnections.dropFirst() {
+                if primary.id != secondary.id {
+                    mergeRooms(primary.id, secondary.id)
+                }
+            }
+        }
     }
     
     /// Convert the internal graph to the API's MapDescription format

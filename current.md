@@ -158,4 +158,55 @@ Tests/ICFPWorkerLibTests/                   # 41 tests all passing ✅
 4. **Configuration flexibility**: Easy adjustment for different contest scenarios
 5. **Comprehensive logging**: Real-time visibility into exploration progress
 
+## 🧠 Graph Theory Analysis & Algorithmic Approach
+
+### Problem Formulation
+This is a **labeled directed multigraph reconstruction problem**:
+- **Vertices**: Up to 30 rooms with 2-bit labels (only 4 possible values)
+- **Edges**: Directed connections through 6 doors per room
+- **Challenge**: Multiple rooms share same labels (avg 7-8 rooms per label)
+- **Constraint**: Only observe label sequences from paths starting at fixed vertex
+
+### Applicable Graph Theory Algorithms
+
+1. **Graph Isomorphism & Canonical Labeling**
+   - Detect when different paths lead to same room
+   - Reduce phantom room creation
+
+2. **Chinese Postman Problem Variants**
+   - Find optimal paths covering all edges
+   - Adapt for partial observability
+
+3. **Distinguishing Sequences (Automata Theory)**
+   - Generate minimal paths to differentiate rooms with same label
+   - Critical for 30-room scale with only 4 labels
+
+4. **Belief Propagation & Constraint Satisfaction**
+   - Propagate connection constraints through graph
+   - Infer missing connections from known ones
+
+### Phase 1 Implementation (NEW) - Scalable to 30 Rooms
+
+#### Room Signature Approach
+Instead of relying on labels alone, we now use composite signatures:
+```
+RoomSignature = (label, self-loop doors, transition doors, neighbor label distribution)
+```
+
+#### Phase 1 Strategy
+1. **Complete single-door exploration** (6 paths)
+2. **Two-door return paths** for bidirectional discovery (36 paths)
+3. **BFS to depth 2-3** for systematic discovery
+4. **Distinguishing sequences** for ambiguous rooms
+
+#### Key Components Added
+- **Phase1Analyzer.swift**: Handles room signatures and clustering
+- **GraphHypothesis**: Maintains probabilistic graph model
+- **Entropy-based path selection**: Coming next
+
+### Expected Performance
+- **Small graphs (2-3 rooms)**: ~10-20 explorations
+- **Medium graphs (10 rooms)**: ~50-100 explorations
+- **Large graphs (30 rooms)**: ~150-200 explorations
+
 The VibeWorker is now ready for contest deployment and provides a sophisticated, tested solution for the ICFP 2025 Ædificium mapping challenge.

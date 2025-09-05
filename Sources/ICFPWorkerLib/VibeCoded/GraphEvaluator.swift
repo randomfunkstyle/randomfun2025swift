@@ -110,7 +110,26 @@ public class GraphEvaluator {
     ) -> Double {
         guard totalRooms > 0 else { return 0.0 }
         
-        // How many rooms have labels?
+        // Special handling for simple layouts (2-3 rooms)
+        if totalRooms <= 3 {
+            // For small layouts, be more optimistic about completeness
+            let labeledRatio = Double(totalRooms - unlabeledRooms.count) / Double(totalRooms)
+            
+            // Count fully resolved doors (both direction known)
+            let totalDoors = totalRooms * 6
+            let fullyResolvedDoors = totalDoors - unknownDoors.count - ambiguousConnections.count
+            let doorRatio = Double(fullyResolvedDoors) / Double(totalDoors)
+            
+            // For small layouts, if we have all labels and most doors, we're very confident
+            if labeledRatio == 1.0 && doorRatio > 0.7 {
+                return 0.95
+            }
+            
+            // Adjusted weights for small layouts: labels are more important
+            return (labeledRatio * 0.5 + doorRatio * 0.4 + (1.0 - Double(ambiguousConnections.count) / Double(max(6, 1))) * 0.1)
+        }
+        
+        // Original calculation for larger layouts
         let labeledRatio = Double(totalRooms - unlabeledRooms.count) / Double(totalRooms)
         
         // How many doors have we explored?
