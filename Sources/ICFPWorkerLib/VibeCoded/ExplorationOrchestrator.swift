@@ -21,6 +21,20 @@ public class ExplorationOrchestrator {
     /// Confidence level required to consider graph complete
     private let confidenceThreshold: Double
     
+    /// Current iteration number (for Worker compatibility)
+    private var currentIteration: Int = 0
+    /// Current exploration phase
+    private var explorationPhase: ExplorationPhase = .initialExploration
+    /// Track the last generated plans to pair with results
+    private var lastGeneratedPlans: [String] = []
+    
+    /// Exploration phases matching Worker lifecycle
+    public enum ExplorationPhase {
+        case initialExploration
+        case iterativeRefinement
+        case finalMapping
+    }
+    
     /// Final result of the exploration process
     public struct ExplorationResult {
         /// Whether the map was successfully discovered
@@ -245,5 +259,109 @@ public class ExplorationOrchestrator {
         }
         
         return true
+    }
+    
+    // MARK: - Worker-Compatible Methods
+    
+    /// Generate exploration plans based on current phase
+    /// Compatible with Worker.generatePlans()
+    public func generatePlans() -> [String] {
+        let plans: [String]
+        
+        switch explorationPhase {
+        case .initialExploration:
+            // Phase 1: Basic exploration
+            plans = pathGenerator.generatePaths(strategy: .basic)
+            
+        case .iterativeRefinement:
+            // Phase 2: Intelligent prediction
+            let nextPaths = predictor.predictNextPaths(graph: graphBuilder, evaluator: evaluator)
+            if nextPaths.isEmpty {
+                plans = pathGenerator.generatePaths(strategy: .systematic)
+            } else {
+                plans = nextPaths
+            }
+            
+        case .finalMapping:
+            // No more exploration needed
+            plans = []
+        }
+        
+        // Track the generated plans for later processing
+        lastGeneratedPlans = plans
+        return plans
+    }
+    
+    /// Process exploration results and update graph
+    /// Compatible with Worker.processExplored()
+    public func processExplored(explored: ExploreResponse) {
+        // Track exploration count
+        explorationCount += 1
+        
+        // Process each path-result pair using the last generated plans
+        for (index, path) in lastGeneratedPlans.enumerated() {
+            if index < explored.results.count {
+                let labels = explored.results[index]
+                _ = graphBuilder.processExploration(path: path, labels: labels)
+                inferConnectionsFromPath(path: path, labels: labels)
+            }
+        }
+        
+        // Try room merging if conditions are met
+        if shouldTryMergingRooms() {
+            attemptRoomMerging()
+        }
+    }
+    
+    /// Determine if exploration should continue
+    /// Compatible with Worker.shouldContinue()
+    public func shouldContinue(iterations: Int) -> Bool {
+        currentIteration = iterations
+        
+        // Check limits
+        if explorationCount >= maxExplorations {
+            explorationPhase = .finalMapping
+            return false
+        }
+        
+        // Evaluate current graph state
+        let evaluation = evaluator.evaluate(graph: graphBuilder)
+        
+        // Check if we're confident enough
+        if evaluation.isComplete || evaluation.confidence >= confidenceThreshold {
+            explorationPhase = .finalMapping
+            return false
+        }
+        
+        // Transition from initial to iterative phase after first iteration
+        if explorationPhase == .initialExploration && iterations > 1 {
+            explorationPhase = .iterativeRefinement
+        }
+        
+        return true
+    }
+    
+    /// Generate final map guess
+    /// Compatible with Worker.generateGuess()
+    public func generateGuess() -> MapDescription {
+        return graphBuilder.toMapDescription()
+    }
+    
+    // MARK: - Public Accessors for VibeWorker
+    
+    /// Get current exploration count
+    public func getExplorationCount() -> Int {
+        return explorationCount
+    }
+    
+    /// Get current confidence level
+    public func getCurrentConfidence() -> Double {
+        let evaluation = evaluator.evaluate(graph: graphBuilder)
+        return evaluation.confidence
+    }
+    
+    /// Get current exploration phase
+    public func getCurrentPhase() -> ExplorationPhase {
+        return explorationPhase
     }
 }
