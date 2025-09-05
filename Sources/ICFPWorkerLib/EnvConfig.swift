@@ -4,7 +4,23 @@ public class EnvConfig {
     public let teamId: String
     public let apiUrl: String
 
-    public init(fromFile path: String = ".env") {
+    public init(fromFile path: String? = nil) {
+        
+        var path = path
+        if path == nil {
+            // Take from environment variable
+            path = ProcessInfo.processInfo.environment["ICFP_CONFIG_PATH"]
+        }
+        
+        if path == nil {
+            // Default path
+            path = ".env"
+        }
+        
+        guard let path = path else {
+            preconditionFailure("Path should not be nil here")
+        }
+        
         guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
             teamId = "nil"
             apiUrl = "nil"
