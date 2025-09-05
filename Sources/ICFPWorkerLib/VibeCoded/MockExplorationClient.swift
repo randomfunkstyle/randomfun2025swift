@@ -25,6 +25,7 @@ public class MockExplorationClient: ExplorationClient {
         case threeRoomsFourSelfLoops
         case threeRoomsFiveSelfLoops
         case fromFile(String)  // Load from a map file
+        case fromConfig(String)  // Load from a config file
     }
 
     /// Initialize with optional simple hexagon structure
@@ -52,7 +53,13 @@ public class MockExplorationClient: ExplorationClient {
             setupThreeRoomsFiveSelfLoops()
         case .fromFile(let filename):
             setupFromFile(filename)
+        case .fromConfig(let filename):
+            setupFromConfig(filename)
         }
+    }
+    
+    private func setupFromConfig(_ filename: String) {
+        setupFromFile(filename)  // Both use the same logic now that MapFileLoader handles config files
     }
     
     private func setupFromFile(_ filename: String) {
@@ -70,11 +77,13 @@ public class MockExplorationClient: ExplorationClient {
             // Map room IDs to indices
             let roomIdToIndex = Dictionary(uniqueKeysWithValues: config.roomIds.enumerated().map { ($1, $0) })
             
-            // Process connections
+            // Process connections - they are bidirectional!
             for conn in config.connections {
                 if let fromIndex = roomIdToIndex[conn.from],
                    let toIndex = roomIdToIndex[conn.to] {
+                    // Set up bidirectional connection
                     roomConnections[fromIndex]?[conn.fromDoor] = toIndex
+                    roomConnections[toIndex]?[conn.toDoor] = fromIndex
                 }
             }
             

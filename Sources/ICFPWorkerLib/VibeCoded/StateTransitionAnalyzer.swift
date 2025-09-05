@@ -50,27 +50,83 @@ public class StateTransitionAnalyzer {
         for (path, labels) in zip(paths, results) {
             exploredPaths.insert(path)
             
-            // Process each state in the path
-            var currentPath = ""
-            for (index, label) in labels.enumerated() {
-                stateLabels[currentPath] = label
-                
-                // Add transition if not at end
-                if index < path.count {
-                    let doorChar = path[path.index(path.startIndex, offsetBy: index)]
-                    if let door = Int(String(doorChar)) {
-                        let nextPath = currentPath + String(door)
-                        let nextLabel = labels[index + 1]
+            // For special pattern analysis - detect if this is a return-pair pattern
+            if path.hasPrefix("001122334455") {
+                processReturnPairPattern(path: path, labels: labels)
+            } else {
+                processGeneralPath(path: path, labels: labels)
+            }
+        }
+    }
+    
+    /// Process the return-pair pattern specially
+    private func processReturnPairPattern(path: String, labels: [Int]) {
+        // Process each pair separately since they return to start
+        var pairStart = 0
+        
+        while pairStart < path.count - 1 {
+            let doorIndex1 = path.index(path.startIndex, offsetBy: pairStart)
+            let doorIndex2 = path.index(path.startIndex, offsetBy: pairStart + 1)
+            
+            if path[doorIndex1] == path[doorIndex2] && pairStart + 2 < labels.count {
+                // This is a return pair like "00", "11", etc.
+                if let door = Int(String(path[doorIndex1])) {
+                    let startLabel = labels[pairStart]
+                    let midLabel = labels[pairStart + 1]
+                    let endLabel = labels[pairStart + 2]
+                    
+                    if startLabel == endLabel && startLabel != midLabel {
+                        // This is a confirmed return - we're back at start
+                        stateLabels[""] = startLabel
+                        stateLabels[String(door)] = midLabel
                         
                         transitions.append(Transition(
-                            fromState: currentPath,
+                            fromState: "",
                             door: door,
-                            toState: nextPath,
-                            toLabel: nextLabel
+                            toState: String(door),
+                            toLabel: midLabel
                         ))
                         
-                        currentPath = nextPath
+                        // The return transition
+                        transitions.append(Transition(
+                            fromState: String(door),
+                            door: door,
+                            toState: "",  // Back to start!
+                            toLabel: startLabel
+                        ))
                     }
+                }
+                pairStart += 2
+            } else {
+                pairStart += 1
+            }
+        }
+        
+        // Also process it as a general path for additional information
+        processGeneralPath(path: path, labels: labels)
+    }
+    
+    /// Process a general path
+    private func processGeneralPath(path: String, labels: [Int]) {
+        var currentPath = ""
+        for (index, label) in labels.enumerated() {
+            stateLabels[currentPath] = label
+            
+            // Add transition if not at end
+            if index < path.count && index + 1 < labels.count {
+                let doorChar = path[path.index(path.startIndex, offsetBy: index)]
+                if let door = Int(String(doorChar)) {
+                    let nextPath = currentPath + String(door)
+                    let nextLabel = labels[index + 1]
+                    
+                    transitions.append(Transition(
+                        fromState: currentPath,
+                        door: door,
+                        toState: nextPath,
+                        toLabel: nextLabel
+                    ))
+                    
+                    currentPath = nextPath
                 }
             }
         }
@@ -121,10 +177,28 @@ public class StateTransitionAnalyzer {
             }
         }
         
-        // Step 3: Find ALL bidirectional connections from return paths
+        // Step 3: Find ALL bidirectional connections from transitions
+        // Look for transitions that form cycles back to start
+        for trans in transitions {
+            if trans.toState == "" && trans.fromState.count == 1 {
+                // This is a return to start from a single-door state
+                if let door1 = Int(trans.fromState), // The door we took to get to this state
+                   let room0Id = labelToRoomId[startLabel],
+                   let room1Label = stateLabels[trans.fromState],
+                   let room1Id = labelToRoomId[room1Label] {
+                    let door2 = trans.door  // The door that returns us
+                    // We found: start --door1--> state --door2--> start
+                    // This means room0:door1 connects to room1:door2
+                    rooms[room0Id].doors[door1] = (toRoomId: room1Id, toDoor: door2)
+                    rooms[room1Id].doors[door2] = (toRoomId: room0Id, toDoor: door1)
+                }
+            }
+        }
+        
+        // Also check exploredPaths for 2-char return paths
         for path in exploredPaths where path.count == 2 {
             let labels = getLabelsForPath(path)
-            if labels.count == 3 && labels[0] == labels[2] {
+            if labels.count == 3 && labels[0] == labels[2] && labels[0] != labels[1] {
                 // This is a return path: A -> B -> A
                 let door1Char = path[path.index(path.startIndex, offsetBy: 0)]
                 let door2Char = path[path.index(path.startIndex, offsetBy: 1)]
@@ -152,6 +226,28 @@ public class StateTransitionAnalyzer {
                         // Add connection if not already mapped
                         if rooms[fromRoomId].doors[door] == nil {
                             rooms[fromRoomId].doors[door] = (toRoomId: toRoomId, toDoor: nil)
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Step 5: Infer bidirectional door mappings
+        // If A:x -> B and B:y -> A, then A:x <-> B:y
+        for (roomId, room) in rooms.enumerated() {
+            for (door, connection) in room.doors {
+                if let conn = connection, conn.toDoor == nil {
+                    // We know A:door -> B but not which door on B
+                    let targetRoomId = conn.toRoomId
+                    
+                    // Check if B has a connection back to A
+                    for (targetDoor, targetConn) in rooms[targetRoomId].doors {
+                        if let tConn = targetConn, 
+                           tConn.toRoomId == roomId && 
+                           (tConn.toDoor == nil || tConn.toDoor == door) {
+                            // Found bidirectional connection
+                            rooms[roomId].doors[door] = (toRoomId: targetRoomId, toDoor: targetDoor)
+                            rooms[targetRoomId].doors[targetDoor] = (toRoomId: roomId, toDoor: door)
                         }
                     }
                 }
@@ -320,6 +416,128 @@ public class StateTransitionAnalyzer {
         return !rooms.isEmpty
     }
     
+    /// Find return pairs in path - patterns like "XY" where we return to original room
+    /// These reveal bidirectional connections with high information gain
+    public func findReturnPairs(in path: String, with labels: [Int]) -> [(door1: Int, door2: Int, startLabel: Int)] {
+        var returnPairs: [(door1: Int, door2: Int, startLabel: Int)] = []
+        
+        // Look for 2-door sequences that return to start
+        if path.count >= 2 && labels.count >= 3 {
+            for i in 0..<(path.count - 1) {
+                // Check if we have enough labels
+                if i + 2 < labels.count {
+                    let startLabel = labels[i]
+                    let middleLabel = labels[i + 1]
+                    let endLabel = labels[i + 2]
+                    
+                    // Check if this is a return path
+                    if startLabel == endLabel && startLabel != middleLabel {
+                        let door1Index = path.index(path.startIndex, offsetBy: i)
+                        let door2Index = path.index(path.startIndex, offsetBy: i + 1)
+                        
+                        if let door1 = Int(String(path[door1Index])),
+                           let door2 = Int(String(path[door2Index])) {
+                            returnPairs.append((door1: door1, door2: door2, startLabel: startLabel))
+                        }
+                    }
+                }
+            }
+        }
+        
+        return returnPairs
+    }
+    
+    /// Extract maximum structural information from a single path
+    public func extractStructuralInformation(from path: String, labels: [Int]) -> StructuralInfo {
+        var info = StructuralInfo()
+        
+        // Find all return pairs (highest information value)
+        let returnPairs = findReturnPairs(in: path, with: labels)
+        info.bidirectionalConnections = returnPairs
+        
+        // Find cycles (sequences that return to same state)
+        info.cycles = findCycles(in: path, with: labels)
+        
+        // Extract transition patterns
+        info.transitionPatterns = extractTransitionPatterns(from: path, with: labels)
+        
+        // Calculate information gain
+        info.informationBits = calculateInformationGain(returnPairs: returnPairs, cycles: info.cycles)
+        
+        return info
+    }
+    
+    /// Find cycles in the path (subsequences that return to same label)
+    private func findCycles(in path: String, with labels: [Int]) -> [(sequence: String, fromLabel: Int, length: Int)] {
+        var cycles: [(sequence: String, fromLabel: Int, length: Int)] = []
+        
+        for startIdx in 0..<path.count {
+            let startLabel = labels[startIdx]
+            
+            // Look for returns to same label
+            for endIdx in (startIdx + 1)..<min(path.count, labels.count - 1) {
+                if labels[endIdx + 1] == startLabel {
+                    let startIndex = path.index(path.startIndex, offsetBy: startIdx)
+                    let endIndex = path.index(path.startIndex, offsetBy: endIdx + 1)
+                    let sequence = String(path[startIndex..<endIndex])
+                    
+                    cycles.append((sequence: sequence, fromLabel: startLabel, length: sequence.count))
+                    
+                    // Limit cycles to avoid too many overlapping ones
+                    if cycles.count > 20 { break }
+                }
+            }
+            if cycles.count > 20 { break }
+        }
+        
+        return cycles
+    }
+    
+    /// Extract transition patterns from the path
+    private func extractTransitionPatterns(from path: String, with labels: [Int]) -> [String: Int] {
+        var patterns: [String: Int] = [:]
+        
+        // Count 2-door and 3-door patterns
+        for len in 2...3 {
+            if path.count >= len {
+                for i in 0...(path.count - len) {
+                    let startIndex = path.index(path.startIndex, offsetBy: i)
+                    let endIndex = path.index(path.startIndex, offsetBy: i + len)
+                    let pattern = String(path[startIndex..<endIndex])
+                    patterns[pattern, default: 0] += 1
+                }
+            }
+        }
+        
+        return patterns
+    }
+    
+    /// Calculate information gain in bits
+    private func calculateInformationGain(returnPairs: [(door1: Int, door2: Int, startLabel: Int)], 
+                                         cycles: [(sequence: String, fromLabel: Int, length: Int)]) -> Double {
+        // Each return pair reveals ~4.6 bits about bidirectional connections
+        let returnPairBits = Double(returnPairs.count) * 4.6
+        
+        // Each unique cycle reveals ~2 bits about structure
+        let uniqueCycles = Set(cycles.map { $0.sequence })
+        let cycleBits = Double(uniqueCycles.count) * 2.0
+        
+        return returnPairBits + cycleBits
+    }
+}
+
+/// Structural information extracted from a path
+public struct StructuralInfo {
+    public var bidirectionalConnections: [(door1: Int, door2: Int, startLabel: Int)] = []
+    public var cycles: [(sequence: String, fromLabel: Int, length: Int)] = []
+    public var transitionPatterns: [String: Int] = [:]
+    public var informationBits: Double = 0.0
+    
+    public init() {}
+}
+
+// Extension continues with existing methods  
+extension StateTransitionAnalyzer {
     /// Generate suggested paths to explore
     public func getSuggestedPaths() -> [String] {
         var suggestions: [String] = []

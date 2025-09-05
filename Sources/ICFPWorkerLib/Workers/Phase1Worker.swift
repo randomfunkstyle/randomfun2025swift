@@ -3,13 +3,14 @@ import Foundation
 /// Worker that implements comprehensive Phase 1 exploration strategy
 /// Designed to handle graphs with up to 30 rooms efficiently
 public class Phase1Worker: Worker {
-    private let phase1Analyzer = Phase1Analyzer()
+    private let phase1Analyzer: Phase1Analyzer
     private let graphBuilder = GraphConnectionBuilder()
     private var explorationCount = 0
     private let maxExplorations: Int
     
     public init(problem: Problem, client: ExplorationClient, maxExplorations: Int = 200) {
         self.maxExplorations = maxExplorations
+        self.phase1Analyzer = Phase1Analyzer(roomCount: problem.roomsCount)
         super.init(problem: problem, client: client)
     }
     
@@ -60,7 +61,7 @@ public class Phase1Worker: Worker {
                 
                 let hypothesis = phase1Analyzer.getCurrentHypothesis()
                 print("    Room signatures found: \(hypothesis.roomSignatures.count)")
-                print("    Room count estimate: \(hypothesis.roomCountEstimate)")
+                print("    Expected room count: \(hypothesis.expectedRoomCount)")
                 print("    Confidence: \(String(format: "%.2f", hypothesis.connectionConfidence))")
             }
             

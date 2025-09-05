@@ -44,9 +44,12 @@ Contestants must map a complex library (the Ædificium) with hexagonal rooms. Th
 
 ## Exploration Strategy
 - Route plans are sequences of door numbers (0-5)
+- **Maximum path length: 18 * number_of_rooms** (e.g., for 3 rooms, max path length is 54)
+- **IMPORTANT: Cannot use batch exploration** - Each exploration must be a single path
 - Each expedition records 2-bit room labels encountered
 - The challenge is to deduce the complete map structure from partial observations
 - Objective: minimize the number of expeditions needed to map the library
+- **Approach: Use entropy-optimal paths** that maximize information gain about structure (e.g., "001122334455" pattern tests bidirectional connections)
 
 ## Scoring System
 - Teams are ranked by expedition efficiency (fewer is better)

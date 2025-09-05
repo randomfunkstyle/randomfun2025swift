@@ -24,10 +24,14 @@ public class Phase1Analyzer {
     /// Hypothesis about the graph structure
     public struct GraphHypothesis {
         public var roomSignatures: Set<RoomSignature> = []
-        public var roomCountEstimate: Range<Int> = 1..<2
+        public let expectedRoomCount: Int  // Known from the task
         public var labelDistribution: [Int: Int] = [:]
         public var exploredPaths: Set<String> = []
         public var connectionConfidence: Double = 0.0
+        
+        public init(expectedRoomCount: Int) {
+            self.expectedRoomCount = expectedRoomCount
+        }
     }
     
     /// Room state during exploration
@@ -37,8 +41,17 @@ public class Phase1Analyzer {
     }
     
     private var allExplorations: [ExplorationState] = []
-    private var currentHypothesis = GraphHypothesis()
+    private var currentHypothesis: GraphHypothesis
     private let stateAnalyzer = StateTransitionAnalyzer()
+    private let expectedRoomCount: Int
+    private let smartPathGenerator: SmartPathGenerator
+    
+    /// Initialize with known room count from the task
+    public init(roomCount: Int) {
+        self.expectedRoomCount = roomCount
+        self.currentHypothesis = GraphHypothesis(expectedRoomCount: roomCount)
+        self.smartPathGenerator = SmartPathGenerator(roomCount: roomCount)
+    }
     
     /// Process a batch of exploration results
     public func processExplorations(paths: [String], results: [[Int]]) {
@@ -52,7 +65,64 @@ public class Phase1Analyzer {
         updateHypothesisFromStates()
     }
     
-    /// Generate initial exploration paths for Phase 1
+    /// Generate a single long random path up to 18*roomCount length (legacy)
+    public func generateSingleLongPath() -> String {
+        let maxLength = 18 * expectedRoomCount
+        var path = ""
+        
+        // Generate random path up to maxLength
+        for _ in 0..<maxLength {
+            path += String(Int.random(in: 0..<6))
+        }
+        
+        return path
+    }
+    
+    /// Generate entropy-optimal path using SmartPathGenerator
+    public func generateSmartPath() -> String {
+        let rooms = stateAnalyzer.identifyRooms()
+        
+        if currentHypothesis.exploredPaths.isEmpty {
+            // First exploration: use entropy-optimal initial path
+            return smartPathGenerator.generateInitialPath()
+        } else {
+            // Adaptive path based on current knowledge
+            let mappedConnections = countMappedConnections(rooms)
+            return smartPathGenerator.generateAdaptivePath(
+                identifiedRooms: rooms.count,
+                mappedConnections: mappedConnections
+            )
+        }
+    }
+    
+    /// Count how many connections we've mapped
+    private func countMappedConnections(_ rooms: [StateTransitionAnalyzer.Room]) -> Int {
+        var count = 0
+        for room in rooms {
+            for door in 0..<6 {
+                if room.doors[door] != nil {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+    
+    /// Generate next path based on current knowledge
+    public func generateNextPath() -> String? {
+        // Check if we're confident enough to stop
+        let rooms = stateAnalyzer.identifyRooms()
+        let isComplete = stateAnalyzer.isComplete()
+        
+        if isComplete && rooms.count == expectedRoomCount {
+            return nil  // We're done
+        }
+        
+        // Use smart path generation for better information gain
+        return generateSmartPath()
+    }
+    
+    /// Generate initial exploration paths for Phase 1 (legacy batch method)
     public func generateInitialPaths() -> [String] {
         var paths: [String] = []
         
@@ -75,7 +145,9 @@ public class Phase1Analyzer {
         let important3Paths = [
             "000", "111", "222", "333", "444", "555",  // Triple same door
             "055", "155", "255", "355", "455",  // Paths to reach third room via door 5
-            "500", "511", "522", "533", "544"   // Return paths
+            "500", "511", "522", "533", "544",  // Return paths
+            "540", "541", "542", "543", "545",  // Explore room C's doors (reached via 54)
+            "450", "451", "452", "453", "455"   // Explore room C's doors (reached via 45)
         ]
         for path in important3Paths {
             if !currentHypothesis.exploredPaths.contains(path) {
@@ -154,7 +226,6 @@ public class Phase1Analyzer {
         
         // Update hypothesis
         currentHypothesis.roomSignatures = signatures
-        currentHypothesis.roomCountEstimate = rooms.count..<(rooms.count + 1)
         currentHypothesis.labelDistribution = labelCounts
         currentHypothesis.connectionConfidence = calculateConfidence()
     }
@@ -257,6 +328,9 @@ public class Phase1Analyzer {
         let rooms = stateAnalyzer.identifyRooms()
         if rooms.isEmpty { return 0.0 }
         
+        // Check if we have the expected number of rooms
+        let roomCountMatch = rooms.count == expectedRoomCount ? 1.0 : 0.5
+        
         // Check completeness of room mapping
         var totalDoors = 0
         var mappedDoors = 0
@@ -275,7 +349,8 @@ public class Phase1Analyzer {
         let explorationCount = Double(currentHypothesis.exploredPaths.count)
         let explorationConfidence = min(1.0, explorationCount / 100.0)
         
-        return (mappingCompleteness * 0.7 + explorationConfidence * 0.3)
+        // Weight room count match heavily (40%), mapping completeness (40%), exploration (20%)
+        return (roomCountMatch * 0.4 + mappingCompleteness * 0.4 + explorationConfidence * 0.2)
     }
     
     /// Get current hypothesis
@@ -325,15 +400,16 @@ public class Phase1Analyzer {
     /// Check if Phase 1 is complete
     public func isPhase1Complete() -> Bool {
         // Consider Phase 1 complete when:
-        // 1. We've done at least 42 explorations (6 + 36)
-        // 2. We have good signature coverage
-        // 3. Room count estimate is narrow enough
+        // 1. We have the expected number of rooms
+        // 2. All rooms are fully mapped
+        // 3. High confidence score
         
-        let explorationCount = currentHypothesis.exploredPaths.count
-        let roomCountRange = currentHypothesis.roomCountEstimate.upperBound - currentHypothesis.roomCountEstimate.lowerBound
+        let rooms = stateAnalyzer.identifyRooms()
+        let hasExpectedRooms = rooms.count == expectedRoomCount
+        let isComplete = stateAnalyzer.isComplete()
         
-        return explorationCount >= 42 && 
-               roomCountRange <= 5 && 
-               currentHypothesis.connectionConfidence > 0.7
+        return hasExpectedRooms && 
+               isComplete && 
+               currentHypothesis.connectionConfidence > 0.8
     }
 }
