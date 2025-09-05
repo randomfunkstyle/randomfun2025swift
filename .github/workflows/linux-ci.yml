@@ -13,9 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install Swift
-        uses: swift-actions/setup-swift@next
-        with:
-          swift-version: '5.9'
+        run: |
+          curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz && \
+          tar zxf swiftly-$(uname -m).tar.gz && \
+          ./swiftly init --quiet-shell-followup && \
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh" && \
+          hash -r
       - name: Build
         run: swift build
       - name: Run tests
