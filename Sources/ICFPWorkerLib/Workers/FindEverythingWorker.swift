@@ -91,9 +91,9 @@ public final class FindEverythingWorker: Worker {
                 if current === room {
                     return path
                 }
-//                if visited.contains(where: { $0 === current }) {
-//                    continue
-//                }
+                if visited.contains(where: { $0 === current }) {
+                    continue
+                }
                 visited.append(current)
                 
                 for door in current.doors {
@@ -118,26 +118,46 @@ public final class FindEverythingWorker: Worker {
             addRoom(room)
             //            log("Total unique rooms found: \(foundUniqueRooms)/\(unboundedRooms.count)")
             compactRooms()
-            //            log("[Compact]    rooms found: \(foundUniqueRooms)/\(unboundedRooms.count)")
         }
         
         private func compactRooms() {
             // Task for compact is to simplify allVisitedRooms by changing those to defined once and cleanup
             var newUnboundedRooms: [ExplorationRoom] = []
             
-            for room in unboundedRooms {
-                
-                // TODO: Set bounded room immediately when we find it
-                removeAllInvalidPotentialIndexes(room)
-            }
             
             var processedRooms: [ExplorationRoom] = []
             
-            func processChildren(room: ExplorationRoom, definedOne: ExplorationRoom) {
-                //                guard room !== definedOne else { return }
-                //                guard !processedRooms.contains(where: { $0 === room }) else { return }
-                //                processedRooms.append(room)
-                //
+            func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom) -> ExplorationRoom {
+                let mergedRoom = ExplorationRoom(label: room1.label, path: room1.path, roomsCount: totalRoomsCount)
+                mergedRoom.potential = room1.potential.intersection(room2.potential)
+                processedRooms.append(mergedRoom)
+                processChildren(unboundRoom: room1, boundRoom: room2)
+                return mergedRoom
+            }
+            
+            func processChildren(unboundRoom: ExplorationRoom, boundRoom: ExplorationRoom) {
+                guard unboundRoom !== boundRoom else { return }
+                guard !processedRooms.contains(where: { $0 === unboundRoom }) else { return }
+                processedRooms.append(unboundRoom)
+                for (unboundRoomDoor, boundRoomDoor) in zip(unboundRoom.doors, boundRoom.doors) {
+                    // Simplest case, we don't have info about door but roomDoor has it
+                    if boundRoomDoor.destinationRoom == nil, let roomDestination = unboundRoomDoor.destinationRoom {
+                        boundRoomDoor.destinationRoom = roomDestination
+                    } else if unboundRoomDoor.destinationRoom == nil, let definedRoomDestination = boundRoomDoor.destinationRoom {
+                        unboundRoomDoor.destinationRoom = definedRoomDestination
+                    } else if let boundDestinationRoom = boundRoomDoor.destinationRoom, let unboundDestinationRoom = unboundRoomDoor.destinationRoom, boundDestinationRoom !== unboundDestinationRoom {
+                        
+                        // Merge Information from the doorZ
+                        
+                        let mergedRoom = mergeTwoRooms(room1: boundDestinationRoom, room2: unboundDestinationRoom)
+                        boundRoomDoor.destinationRoom = mergedRoom
+                        unboundRoomDoor.destinationRoom = mergedRoom
+                        
+                    }
+                }
+
+                
+
                 //                for (roomDoor, definedRoomDoor) in zip(room.doors, definedOne.doors) {
                 //                    if let roomDestinationRoom = roomDoor.destinationRoom,
                 //                       let definedRoomDestinationRoom = definedRoomDoor.destinationRoom,
@@ -152,57 +172,22 @@ public final class FindEverythingWorker: Worker {
             
             for room in unboundedRooms {
                 
+                guard !processedRooms.contains(where: { $0 === room }) else { continue }
+                removeAllInvalidPotentialIndexes(room)
+                
+                // As if nothing happened, leave as it is, we still not sure what this is room about
                 guard let index = room.index  else {
                     newUnboundedRooms.append(room)
                     continue
                 }
                 
-                // Room is unbound, but have and index so ti basically the same as one fo bounded/defined rooms
-                
-                guard !processedRooms.contains(where: { $0 === room }) else { continue }
+                // Room is unbound, but have and index so ti basically the same as one fo  bounded/defined rooms
+           
                 
                 // Merge information with the defined room, if we know everything about it
                 if let definedRoom = definedRooms[index] {
                     
-                    // Merge information from the current room to the defined one
-                    
-                    for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
-                        if let roomDoorDestinationRoom = roomDoor.destinationRoom, definedRoomDoor.destinationRoom == nil
-                        {
-                            
-                            // Collapse here if we found boundeded one
-//                            if let index = roomDoorDestinationRoom.index {
-//                                print("We found bounded one! change!")
-//                                definedRoomDoor.destinationRoom = definedRooms[index]!
-//                            } else {
-                                // Add connection to the defined room from the current room
-                                definedRoomDoor.destinationRoom = roomDoorDestinationRoom
-//                            }
-                            
-                            
-                            //                            if definedRoom.path.count > room.path.count {
-                            //                                print("Fond betted path for defined room \(definedRoom) \(room.path) < \(definedRoom.path)")
-                            //
-                            //                                definedRoom.path = room.path
-                            //                            }
-                            
-                        }
-                        // If we have bot dooes leading somwhere we should update destination Room Possibilities
-                        
-                        // TODO: Merge all possible information for childre
-                        // Possiblites shoudl be interesected
-                        
-                        
-                        // Case for self-reference
-//                        if definedRoomDoor.destinationRoom === room {
-//                            print("Collapsed self-reference for room \(definedRoom) \(room.path)")
-//                            definedRoomDoor.destinationRoom = definedRoom
-//                        }
-                        
-                    }
-                    
-                    // Process all children of this room, and try to make those as defined as possible
-                    processChildren(room: room, definedOne: definedRoom)
+                    processChildren(unboundRoom: room, boundRoom: definedRoom)
                     
                 } else {
                     // This is a new unique room found (The last room)
@@ -255,7 +240,7 @@ public final class FindEverythingWorker: Worker {
             unboundedRooms = newUnboundedRooms
         }
         
-        var isMagicNeeded: Bool = false
+        var isMagicNeeded: Bool = true
         
         private func removeAllInvalidPotentialIndexes(_ room: ExplorationRoom) {
             for definedRoom in definedRooms {
@@ -382,7 +367,7 @@ public final class FindEverythingWorker: Worker {
     
     override public func generatePlans() -> [String] {
         let query = String(doorPath(N: problem.roomsCount * iterations))
-        let sentQuery = String(query.suffix(problem.roomsCount * 18))
+        let sentQuery = String(query.suffix(problem.roomsCount * 6))
         
         let lastSubmitted = self.submittedQueries
         self.submittedQueries = []
@@ -402,7 +387,7 @@ public final class FindEverythingWorker: Worker {
                 let additionalQuer = path! + [Int(door.id)!, i]
                 let additionalQueryString = additionalQuer.map { String($0) }.joined()
                 //                + sentQuery
-                let final = String(additionalQueryString.prefix(problem.roomsCount * 18))
+                let final = String(additionalQueryString.prefix(problem.roomsCount * 6))
                 self.submittedQueries.append(final)
             }
         }
@@ -539,6 +524,9 @@ public final class FindEverythingWorker: Worker {
                     
                     log2("[3]Current room changed to \(pointer.room)")
                 }
+                
+                log("[Compact]    rooms found: \(knownState.foundUniqueRooms)/\(knownState.unboundedRooms.count)")
+
             }
         }
         
