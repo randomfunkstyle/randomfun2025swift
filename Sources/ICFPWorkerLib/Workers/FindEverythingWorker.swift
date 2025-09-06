@@ -196,19 +196,6 @@ public final class FindEverythingWorker: Worker {
         }
         
         private func addRoom(_ room: ExplorationRoom) {
-            //            if allVisitedRooms.isEmpty {
-            //                allVisitedRooms.append(room)
-            //                room.potential = Set([foundUniqueRooms])
-            //                foundUniqueRooms += 1
-            //                definedRooms[room.index!] = room
-            //
-            //                log("Added unique room: \(room.index!)")
-            //                rootRoom = room
-            //                return
-            //            }
-            
-            // We aleread know averything about this
-            // Post process other visited rooms
             if let _ = room.index {
                 return
             }
@@ -247,7 +234,34 @@ public final class FindEverythingWorker: Worker {
     }
     
     override public func shouldContinue(iterations it: Int) -> Bool {
-        it < 100
+        // Let's count found unique rooms
+        let uniqueRooms = knownState.foundUniqueRooms
+        print("!!!Unique rooms found: \(uniqueRooms)/\(problem.roomsCount)")
+        
+        var undefinedDoors  = 0
+        for room in knownState.definedRooms {
+            guard let room  else { continue }
+            
+            for door in room.doors {
+                // We need to caclulate all doors that are not moving to defined rooms
+                if let destRoom = door.destinationRoom, destRoom.index == nil {
+                    print("❓Room \(String(describing: room.index)) has door \(door.id) to non-defined room \(destRoom.label) \(destRoom.path) with potential \(destRoom.potential)")
+                    undefinedDoors += 1
+                }
+            }
+        }
+        
+        if undefinedDoors != 0 {
+            print("😢 !!!Undefined doors found: \(undefinedDoors)")
+        }
+        
+        if uniqueRooms == problem.roomsCount && undefinedDoors == 0 {
+            print("Everything is FINE 🔥")
+            return false
+        }
+                
+        
+        return it < 100
     }
     
     //
