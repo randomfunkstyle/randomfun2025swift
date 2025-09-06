@@ -23,7 +23,7 @@ public final class FindEverythingWorker: Worker {
         // External label
         let label: Int
         var path: [Int]
-        let doors: [ExploratoinDoor] = (0 ..< 6).map { ExploratoinDoor(id: String($0)) }
+        var doors: [ExploratoinDoor] = (0 ..< 6).map { ExploratoinDoor(id: String($0)) }
         
         init(label: Int, path: [Int], roomsCount: Int) {
             self.label = label
@@ -91,9 +91,9 @@ public final class FindEverythingWorker: Worker {
                 if current === room {
                     return path
                 }
-                if visited.contains(where: { $0 === current }) {
-                    continue
-                }
+//                if visited.contains(where: { $0 === current }) {
+//                    continue
+//                }
                 visited.append(current)
                 
                 for door in current.doors {
@@ -228,8 +228,24 @@ public final class FindEverythingWorker: Worker {
                         
                         // Replace door with defined rooms
                         log3("Replacing door destination room \(String(describing: door.destinationRoom)) with defined room \(idx)")
-//                        door.destinationRoom =  definedRooms[idx]!
                         
+                        let definedRoom = definedRooms[idx]!
+                        
+                        // 0 (nil)(nil)(1)(2)(3)(4)
+                        // 0' (0)(5)()()()()
+                        //  basically here we need to merge all possible information from the destRoom to the definedRoom
+                        //  so if destRoom has door to some other room, we need to copy that
+                        if isMagicNeeded {
+                            for i in 0..<5 {
+                                if definedRoom.doors[i].destinationRoom == nil, door.destinationRoom?.doors[i].destinationRoom != nil, let someDoor = door.destinationRoom?.doors[i] {
+                                    definedRoom.doors[i] = someDoor
+                                }
+                            }
+                            
+                            door.destinationRoom = definedRoom
+                        }
+                        
+                        door.destinationRoom = definedRoom
                         // TODO:Potentially, we would need to merge information form the destRoom with a defined one <---
                         
                     }
@@ -238,6 +254,8 @@ public final class FindEverythingWorker: Worker {
             
             unboundedRooms = newUnboundedRooms
         }
+        
+        var isMagicNeeded: Bool = false
         
         private func removeAllInvalidPotentialIndexes(_ room: ExplorationRoom) {
             for definedRoom in definedRooms {
@@ -369,6 +387,8 @@ public final class FindEverythingWorker: Worker {
         let lastSubmitted = self.submittedQueries
         self.submittedQueries = []
         
+        // 12-N
+        
         if let room = knownState.definedRooms.compactMap({ $0}).first(where:{ room in
             room.doors.contains(where: { $0.destinationRoom == nil })
         }) {
@@ -377,14 +397,14 @@ public final class FindEverythingWorker: Worker {
             
             print("🍈 Will explore door \(door.id) in room \(room)")
             
-            //            for i in 0..<6 {
-            let path = knownState.path(to: room)
-            let additionalQuer = path! + [Int(door.id)!]
-            let additionalQueryString = additionalQuer.map { String($0) }.joined()
-            //                + sentQuery
-            let final = String(additionalQueryString.prefix(problem.roomsCount * 18))
-            self.submittedQueries.append(final)
-            //            }
+            for i in 0..<6 {
+                let path = knownState.path(to: room)
+                let additionalQuer = path! + [Int(door.id)!, i]
+                let additionalQueryString = additionalQuer.map { String($0) }.joined()
+                //                + sentQuery
+                let final = String(additionalQueryString.prefix(problem.roomsCount * 18))
+                self.submittedQueries.append(final)
+            }
         }
         
         if self.submittedQueries.isEmpty {
