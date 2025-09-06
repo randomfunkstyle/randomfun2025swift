@@ -1,6 +1,15 @@
 {
   "pins" : [
     {
+      "identity" : "accelerate-linux",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/BrokenHandsIO/Accelerate-Linux.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "8eda308ea3129130e90e5c01fc437a4c5d2ca278"
+      }
+    },
+    {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser",

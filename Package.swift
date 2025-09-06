@@ -17,18 +17,23 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0")
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
+        .package(url: "https://github.com/BrokenHandsIO/Accelerate-Linux.git", branch: "main"),
     ],
     targets: [
         .target(
             name: "ICFPWorkerLib",
-            dependencies: []
+            dependencies: [
+                .product(
+                    name: "AccelerateLinux", package: "Accelerate-Linux",
+                    condition: .when(platforms: [.linux]))
+            ]
         ),
         .executableTarget(
             name: "ICFPWorkerCLI",
             dependencies: [
                 "ICFPWorkerLib",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .testTarget(

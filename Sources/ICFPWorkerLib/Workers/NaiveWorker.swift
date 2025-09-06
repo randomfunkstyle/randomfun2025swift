@@ -1,76 +1,107 @@
+import AccelerateLinux
 import Foundation
 
 struct Matrix {
-    private var matrix: [[Double]]
+    private var data: [Double]
+    private let dimension: Int
 
     init(matrix: [[Double]]) {
-        guard matrix.count > 0 && matrix.count == matrix[0].count else {
+        guard !matrix.isEmpty && matrix.count == matrix[0].count else {
             fatalError("Matrix must be non-empty and square")
         }
-        self.matrix = matrix
+        self.dimension = matrix.count
+        self.data = matrix.flatMap { $0 }
     }
 
     init(size: Int, value: Double = 0.0) {
-        self.matrix = Array(repeating: Array(repeating: value, count: size), count: size)
+        guard size > 0 else {
+            fatalError("Matrix size must be positive")
+        }
+        self.dimension = size
+        self.data = Array(repeating: value, count: size * size)
     }
 
     static func empty() -> Matrix {
-        return Matrix(matrix: [])
+        return Matrix(size: 1, value: 0.0)
     }
 
     func copy() -> Matrix {
-        return Matrix(matrix: matrix)
+        var newMatrix = Matrix(size: dimension)
+        newMatrix.data = self.data
+        return newMatrix
     }
 
-    // indexing operator
     subscript(row: Int, col: Int) -> Double {
         get {
-            return matrix[row][col]
+            return data[row * dimension + col]
         }
         set {
-            var newMatrix = matrix
-            newMatrix[row][col] = newValue
+            data[row * dimension + col] = newValue
         }
     }
 
     var size: Int {
-        return matrix.count
+        return dimension
     }
 
     var isEmpty: Bool {
-        return matrix.isEmpty
+        return dimension == 1 && data[0] == 0.0
     }
 
     func softMax() -> Matrix {
-        var newMatrix = copy()
+        guard !isEmpty else { return self }
 
-        for i in 0..<size {
-            var rowSum = 0.0
-            for j in 0..<size {
-                rowSum += self[i, j]
+        var result = copy()
+
+        // For a symmetric matrix, normalize each row to sum to 1
+        // while maintaining symmetry
+        for i in 0..<dimension {
+            // Get max value in row for numerical stability
+            var rowMax = Double.leastNonzeroMagnitude
+            for j in 0..<dimension {
+                rowMax = max(rowMax, result[i, j])
             }
-            let rowMultiplier = rowSum > 0 ? 1.0 / rowSum : 0.0
-            for j in 0..<size {
-                newMatrix[i, j] *= rowMultiplier
-                newMatrix[j, i] *= rowMultiplier
+
+            // Compute exp values for the row
+            var rowExpValues = [Double](repeating: 0.0, count: dimension)
+            for j in 0..<dimension {
+                rowExpValues[j] = exp(result[i, j] - rowMax)
+            }
+
+            // Sum exp values in row
+            let rowSum = rowExpValues.reduce(0.0, +)
+
+            // Normalize row if sum is valid
+            if rowSum > Double.leastNonzeroMagnitude {
+                for j in 0..<dimension {
+                    let normalizedValue = rowExpValues[j] / rowSum
+                    result[i, j] = normalizedValue
+                    // Maintain symmetry
+                    result[j, i] = normalizedValue
+                }
             }
         }
 
-        return newMatrix
+        return result
     }
 
     func matrixOr(matrix2: Matrix) -> Matrix {
-        var newMatrix = copy()
-        for i in 0..<size {
-            for j in 0..<size {
-                newMatrix[i, j] = self[i, j] + matrix2[i, j]
-            }
+        guard self.dimension == matrix2.dimension else {
+            fatalError("Matrix dimensions must match")
         }
-        return newMatrix.softMax()
+
+        var result = Matrix(size: dimension)
+
+        vDSP_vaddD(self.data, 1, matrix2.data, 1, &result.data, 1, vDSP_Length(data.count))
+
+        return result.softMax()
     }
 
     func calcEntropy() -> Double {
+        guard !isEmpty else { return 0.0 }
+
         var entropy: Double = 0.0
+
         for i in 0..<size {
             for j in i..<size {
                 let p = min(
@@ -84,45 +115,58 @@ struct Matrix {
     }
 
     func countNonZero() -> Int {
-        var count = 0
-        for i in 0..<size {
-            for j in 0..<size {
-                if self[i, j] > 0 {
-                    count += 1
-                }
-            }
+        return data.reduce(0) { count, value in
+            count + (value > Double.leastNonzeroMagnitude ? 1 : 0)
         }
-        return count
     }
 
     func isValid() -> Bool {
-        // if any of the rows or columns is all 0, return false
-        for i in 0..<size {
-            if !matrix[i].contains(where: { $0 > Double.leastNonzeroMagnitude }) {
-                return false
-            }
+        guard !isEmpty else { return false }
 
-            var colHasTrue = false
+        // Check if any row is all zeros
+        for i in 0..<size {
+            var hasNonZero = false
             for j in 0..<size {
-                if matrix[j][i] > Double.leastNonzeroMagnitude {
-                    colHasTrue = true
+                if self[i, j] > Double.leastNonzeroMagnitude {
+                    hasNonZero = true
                     break
                 }
             }
-            if !colHasTrue {
+            if !hasNonZero {
                 return false
             }
         }
+
+        // Check if any column is all zeros
+        for j in 0..<size {
+            var hasNonZero = false
+            for i in 0..<size {
+                if self[i, j] > Double.leastNonzeroMagnitude {
+                    hasNonZero = true
+                    break
+                }
+            }
+            if !hasNonZero {
+                return false
+            }
+        }
+
         return true
     }
 
     func printMatrix() {
-        for row in matrix {
-            let line = row.map {
-                $0 <= Double.leastNonzeroMagnitude ? "...." : String(format: "%.2f", $0)
-            }.joined(
-                separator: " ")
-            print(line)
+        guard !isEmpty else {
+            print("Empty matrix")
+            return
+        }
+
+        for i in 0..<size {
+            let row = (0..<size).map { j in
+                let value = self[i, j]
+                return value <= Double.leastNonzeroMagnitude
+                    ? "...." : String(format: "%.2f", value)
+            }
+            print(row.joined(separator: " "))
         }
     }
 }
@@ -215,7 +259,7 @@ public final class NaiveWorker: Worker {
 
     // Monte Carlo configuration parameters
     private let monteCarloSamples = 100
-    private let rolloutDepth = 4
+    private let rolloutDepth = 2
     private let confidenceThreshold = 0.05
 
     public override init(problem: Problem, client: ExplorationClient) {
