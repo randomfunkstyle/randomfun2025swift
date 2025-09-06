@@ -85,10 +85,22 @@ public class MockExplorationClient: ExplorationClient {
         return MapDescription(rooms: roomLabels, startingRoom: idx(0), connections: connections)
     }
 
-    public func setupSecundus() {
+    private func setupSecundus() {
+        correctMap = Self.generateSecundus()
+        roomLabels = correctMap!.rooms
+        roomConnections = [:]
+        for connection in correctMap!.connections {
+            roomConnections[connection.from.room, default: [:]][connection.from.door] =
+                connection.to.room
+            roomConnections[connection.to.room, default: [:]][connection.to.door] =
+                connection.from.room
+        }
+    }
+
+    static func generateSecundus() -> MapDescription {
         let labels: [Int] = [0, 2, 1, 3, 2, 3, 0, 1, 2, 1, 3, 0]
 
-        let connections: [Connection] = []
+        var connections: [Connection] = []
         connections.connect(room: 0, door: 0, toRoom: 1, toDoor: 3)
         connections.connect(room: 0, door: 1, toRoom: 7, toDoor: 0)
         connections.connect(room: 0, door: 2, toRoom: 2, toDoor: 3)
