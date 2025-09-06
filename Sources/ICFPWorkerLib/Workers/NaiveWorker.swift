@@ -37,44 +37,30 @@ class State {
         return newMatrix
     }
 
-    func expand(roomCount: Int, doorCount: Int) -> [Int: [State]] {
-        var outcomes: [Int: [State]] = [:]
-        for door in 0..<doorCount {
-            var possibleOutcomes: [State] = []
+    func sampleOutcome(door: Int, roomCount: Int, doorCount: Int) -> State {
+        let possibleResult = Int.random(in: 0..<roomCount)
+        var newMatrix = matrix
 
-            for possibleResult in 0..<roomCount {
-                var newMatrix = matrix
+        let fromIndex = currentRoom * doorCount + door
 
-                let fromIndex = currentRoom * doorCount + door
-
-                for roomIndex in 0..<roomCount {
-                    if roomIndex == possibleResult {
-                        continue
-                    }
-
-                    for destDoor in 0..<doorCount {
-                        let toIndex = roomIndex * doorCount + destDoor
-                        newMatrix = breakConnections(
-                            matrix: newMatrix, fromIndex: fromIndex, toIndex: toIndex)
-                    }
-                }
-
-                let newSteps = steps + [door]
-                let newState = State(
-                    matrix: newMatrix,
-                    currentRoom: possibleResult,
-                    steps: newSteps
-                )
-                possibleOutcomes.append(newState)
+        for roomIndex in 0..<roomCount {
+            if roomIndex == possibleResult {
+                continue
             }
-            outcomes[door] = possibleOutcomes
-        }
-        return outcomes
-    }
 
-    func getDecisionEntropy(door: Int, outcomes: [Int: [State]]) -> Int {
-        let outcomeStates = outcomes[door]
-        return outcomeStates?.map { $0.entropy }.max() ?? entropy
+            for destDoor in 0..<doorCount {
+                let toIndex = roomIndex * doorCount + destDoor
+                newMatrix = breakConnections(
+                    matrix: newMatrix, fromIndex: fromIndex, toIndex: toIndex)
+            }
+        }
+
+        let newSteps = steps + [door]
+        return State(
+            matrix: newMatrix,
+            currentRoom: possibleResult,
+            steps: newSteps
+        )
     }
 }
 
@@ -85,6 +71,11 @@ public final class NaiveWorker: Worker {
     private var mapDescription: MapDescription? = nil
     private var plan: [Int] = []
 
+    // Monte Carlo configuration parameters
+    private let monteCarloSamples = 1000
+    private let rolloutDepth = 8
+    private let confidenceThreshold = 0.05
+
     public override init(problem: Problem, client: ExplorationClient) {
         self.roomCount = problem.roomsCount
         let size = problem.roomsCount * doorCount
@@ -93,41 +84,63 @@ public final class NaiveWorker: Worker {
         super.init(problem: problem, client: client)
     }
 
-    private func generatePlan() -> [Int] {
-        var states: [State] = [currentState]
+    private func performRollout(state: State, depth: Int) -> Int {
+        var currentState = state
 
-        for step in 0..<(roomCount * doorCount * 3) {
-            let stateOutcomes = states.map { state in
-                (state, state.expand(roomCount: roomCount, doorCount: doorCount))
+        for _ in 0..<depth {
+            if currentState.entropy <= roomCount * doorCount {
+                break
             }
 
+            let randomDoor = Int.random(in: 0..<doorCount)
+            currentState = currentState.sampleOutcome(
+                door: randomDoor, roomCount: roomCount, doorCount: doorCount)
+        }
+
+        return currentState.entropy
+    }
+
+    private func generatePlan() -> [Int] {
+        var currentPlanState = currentState
+
+        for step in 0..<(roomCount * doorCount * 3) {
             var bestDoor = -1
-            var bestEntropy = Int.max
+            var bestAverageEntropy = Double.infinity
 
             for door in 0..<doorCount {
-                let doorEntropy = stateOutcomes.map { (state, outcomes) in
-                    state.getDecisionEntropy(door: door, outcomes: outcomes)
-                }.max()!
+                var entropyResults: [Int] = []
 
-                if doorEntropy < bestEntropy {
-                    bestEntropy = doorEntropy
+                // Run Monte Carlo samples for this door
+                for _ in 0..<monteCarloSamples {
+                    let sampledState = currentPlanState.sampleOutcome(
+                        door: door, roomCount: roomCount, doorCount: doorCount)
+                    let rolloutResult = performRollout(state: sampledState, depth: rolloutDepth)
+                    entropyResults.append(rolloutResult)
+                }
+
+                let averageEntropy =
+                    Double(entropyResults.reduce(0, +)) / Double(entropyResults.count)
+
+                if averageEntropy < bestAverageEntropy {
+                    bestAverageEntropy = averageEntropy
                     bestDoor = door
                 }
             }
 
-            if bestEntropy == roomCount * doorCount {
-                let anyState = states[0]
-                return anyState.steps + [bestDoor]
+            if bestAverageEntropy <= Double(roomCount * doorCount) {
+                return currentPlanState.steps + [bestDoor]
             }
 
-            states = stateOutcomes.flatMap { (_, outcomes) in outcomes[bestDoor]! }
-            printMatrix(matrix: states[0].matrix)
+            // Take the best door and sample one outcome for the next iteration
+            currentPlanState = currentPlanState.sampleOutcome(
+                door: bestDoor, roomCount: roomCount, doorCount: doorCount)
+
+            printMatrix(matrix: currentPlanState.matrix)
             print(
-                "Step \(step), states: \(states.count), entropy: \(bestEntropy), door: \(bestDoor)")
+                "Step \(step), entropy: \(bestAverageEntropy), door: \(bestDoor)")
         }
 
-        let anyState = states[0]
-        return anyState.steps
+        return currentPlanState.steps
     }
 
     private func printMatrix(matrix: [[Bool]]) {
