@@ -192,7 +192,7 @@ public final class FindEverythingWorker: Worker {
                 guard let definedRoomIndex = definedRoom.index else { continue }
                 guard room.potential.contains(definedRoomIndex) else { continue }
                 
-                if isDifferen(room: room, definedRoom: definedRoom, depth: 5) {
+                if isDifferent(room: room, definedRoom: definedRoom, depth: 5) {
                     room.potential.remove(definedRoomIndex)
                     continue
                 }
@@ -200,7 +200,7 @@ public final class FindEverythingWorker: Worker {
         }
         
         
-        private func isDifferen(room: ExplorationRoom, definedRoom:ExplorationRoom, depth: Int) -> Bool {
+        func isDifferent(room: ExplorationRoom, definedRoom:ExplorationRoom, depth: Int) -> Bool {
             guard depth > 0 else { return false }
             guard room.label == definedRoom.label else { return true}
             
@@ -208,11 +208,10 @@ public final class FindEverythingWorker: Worker {
                 guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else { continue }
                 guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
 
-                if isDifferen(room: definedRoomDoorDestinationRoom, definedRoom: roomDoorDestinationRoom, depth: depth - 1) {
+                if isDifferent(room: roomDoorDestinationRoom, definedRoom: definedRoomDoorDestinationRoom, depth: depth - 1) {
                     return true
                 }
             }
-            
             
             return false
             

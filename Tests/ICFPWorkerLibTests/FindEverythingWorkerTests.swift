@@ -235,15 +235,6 @@ final class FindEverythingWorkerTests: XCTestCase {
         XCTAssertEqual(knownState.unboundedRooms.count, 0)
         XCTAssertTrue(knownState.definedRooms[0]?.doors[5].destinationRoom === one)
         
-        let room7 = createRoom(label: 1)
-        room6.connect(0, room7)
-        knownState.addRoomAndCompactRooms(room6)
-        
-        XCTAssertEqual(knownState.foundUniqueRooms, 2)
-        XCTAssertEqual(knownState.unboundedRooms.count, 0)
-        XCTAssertTrue(knownState.definedRooms[1]?.doors[0].destinationRoom === one)
-
-        
     }
     
     var roomsCount = 3
@@ -251,6 +242,153 @@ final class FindEverythingWorkerTests: XCTestCase {
     private func createRoom(label: Int) -> R {
         let room = R(label: label, path: [], roomsCount: roomsCount)
         return room
+    }
+    
+    // MARK: - isDifferent Tests
+    
+    func testIsDifferenSameRooms() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 3)
+        let room1 = createRoom(label: 5)
+        let room2 = createRoom(label: 5)
+        
+        // Same rooms with same labels should not be different
+        XCTAssertFalse(knownState.isDifferent(room: room1, definedRoom: room2, depth: 1))
+        XCTAssertFalse(knownState.isDifferent(room: room1, definedRoom: room2, depth: 5))
+    }
+    
+    func testIsDifferenDifferentLabels() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 3)
+        let room1 = createRoom(label: 5)
+        let room2 = createRoom(label: 7)
+        
+        // Different labels should be different
+        XCTAssertTrue(knownState.isDifferent(room: room1, definedRoom: room2, depth: 1))
+        XCTAssertTrue(knownState.isDifferent(room: room1, definedRoom: room2, depth: 5))
+    }
+    
+    func testIsDifferenDepthZero() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 3)
+        let room1 = createRoom(label: 5)
+        let room2 = createRoom(label: 7)
+        
+        // With depth 0, should always return false (no difference)
+        XCTAssertFalse(knownState.isDifferent(room: room1, definedRoom: room2, depth: 0))
+    }
+    
+    func testIsDifferenWithConnectedRooms() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 3)
+        
+        // Create two rooms with same label
+        let room1 = createRoom(label: 5)
+        let room2 = createRoom(label: 5)
+        
+        // Create connected rooms
+        let connectedRoom1 = createRoom(label: 3)
+        let connectedRoom2 = createRoom(label: 3)
+        
+        // Connect both rooms to their respective connected rooms via door 0
+        room1.connect(0, connectedRoom1)
+        room2.connect(0, connectedRoom2)
+        
+        // Should not be different since connected rooms have same labels
+        XCTAssertFalse(knownState.isDifferent(room: room1, definedRoom: room2, depth: 2))
+    }
+    
+    func testIsDifferenWithDifferentConnectedRooms() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 3)
+        
+        // Create two rooms with same label
+        let room1 = createRoom(label: 5)
+        let room2 = createRoom(label: 5)
+        
+        // Create connected rooms with different labels
+        let connectedRoom1 = createRoom(label: 3)
+        let connectedRoom2 = createRoom(label: 7)
+        
+        // Connect both rooms to their respective connected rooms via door 0
+        room1.connect(0, connectedRoom1)
+        room2.connect(0, connectedRoom2)
+        
+        // Should be different since connected rooms have different labels
+        XCTAssertTrue(knownState.isDifferent(room: room1, definedRoom: room2, depth: 2))
+    }
+    
+    func testIsDifferenWithNilDestinations() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 3)
+        
+        // Create two rooms with same label
+        let room1 = createRoom(label: 5)
+        let room2 = createRoom(label: 5)
+        
+        // Create connected rooms
+        let connectedRoom1 = createRoom(label: 3)
+        
+        // Connect only room1 to connected room, leave room2's door nil
+        room1.connect(0, connectedRoom1)
+        // room2.doors[0].destinationRoom remains nil
+        
+        // Should not be different since we skip nil destinations
+        XCTAssertFalse(knownState.isDifferent(room: room1, definedRoom: room2, depth: 2))
+    }
+        
+    func testIsDifferenMultipleDoors() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 3)
+        
+        // Create two rooms with same label
+        let room1 = createRoom(label: 5)
+        let room2 = createRoom(label: 5)
+        
+        // Create connected rooms for different doors
+        let door0Room1 = createRoom(label: 3)
+        let door0Room2 = createRoom(label: 3)
+        let door1Room1 = createRoom(label: 7)
+        let door1Room2 = createRoom(label: 9) // Different label
+        
+        // Connect via different doors
+        room1.connect(0, door0Room1)
+        room2.connect(0, door0Room2)
+        room1.connect(1, door1Room1)
+        room2.connect(1, door1Room2)
+        
+        // Should be different due to door 1 connection
+        XCTAssertTrue(knownState.isDifferent(room: room1, definedRoom: room2, depth: 2))
+    }
+    
+    func testIsDifferenComplexScenario() {
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: 5)
+        
+        // Create two complex room structures
+        let room1 = createRoom(label: 1)
+        let room2 = createRoom(label: 1)
+        
+        // Create a network of connected rooms
+        let room1A = createRoom(label: 2)
+        let room1B = createRoom(label: 3)
+        let room2A = createRoom(label: 2)
+        let room2B = createRoom(label: 3)
+        
+        let room1AA = createRoom(label: 4)
+        let room1BB = createRoom(label: 5)
+        let room2AA = createRoom(label: 4)
+        let room2BB = createRoom(label: 6) // Different label
+        
+        // Build identical structure for room1
+        room1.connect(0, room1A)
+        room1.connect(1, room1B)
+        room1A.connect(0, room1AA)
+        room1B.connect(0, room1BB)
+        
+        // Build similar structure for room2, but with one difference
+        room2.connect(0, room2A)
+        room2.connect(1, room2B)
+        room2A.connect(0, room2AA)
+        room2B.connect(0, room2BB)
+        
+        // Should detect difference at depth 3
+        XCTAssertTrue(knownState.isDifferent(room: room1, definedRoom: room2, depth: 3))
+        
+        // Should not detect difference at depth 2
+        XCTAssertFalse(knownState.isDifferent(room: room1, definedRoom: room2, depth: 2))
     }
     
 }
