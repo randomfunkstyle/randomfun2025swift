@@ -161,6 +161,51 @@ final class FindEverythingWorkerTests: XCTestCase {
         
     }
     
+    func testOneRoomShouldWor6() {
+        roomsCount = 3
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: roomsCount)
+        
+        // 0
+        let room0 = createRoom(label: 0)
+        let room1 = createRoom(label: 0)
+        room0.connect(0, room1)
+        
+        // (0:)0 -0> (1:)0   <-- unique 1  [0]
+        knownState.addRoomAndCompactRooms(room0)
+        knownState.addRoomAndCompactRooms(room1)
+        
+        let room2 = createRoom(label: 0)
+        room1.connect(1, room2)
+        knownState.addRoomAndCompactRooms(room2)
+
+        XCTAssertEqual(knownState.foundUniqueRooms, 1)
+        
+        let room3 = createRoom(label: 1)
+        room0.connect(3, room3)
+        knownState.addRoomAndCompactRooms(room3)
+        XCTAssertEqual(knownState.foundUniqueRooms, 2)
+        
+        let room4 = createRoom(label: 0)
+        room2.connect(4, room4)
+        knownState.addRoomAndCompactRooms(room4)
+
+        let room5 = createRoom(label: 2)
+        room0.connect(5, room5)
+        knownState.addRoomAndCompactRooms(room5)
+        
+        
+        let zero = knownState.definedRooms[0]!
+        let one = knownState.definedRooms[1]!
+        let two = knownState.definedRooms[2]!
+        XCTAssertTrue(zero.doors[0].destinationRoom === zero)
+        XCTAssertTrue(zero.doors[1].destinationRoom === zero)
+        XCTAssertTrue(zero.doors[4].destinationRoom === zero)
+        XCTAssertTrue(zero.doors[3].destinationRoom === one)
+        XCTAssertTrue(zero.doors[5].destinationRoom === two)
+
+    }
+
+    
     func testOneRoomShouldWor21232() {
         roomsCount = 2
         let knownState = FindEverythingWorker.KnownState(totalRoomsCount: roomsCount)
@@ -254,7 +299,7 @@ final class FindEverythingWorkerTests: XCTestCase {
         XCTAssertEqual(knownState.unboundedRooms.count, 0)
         
         let zero = knownState.definedRooms[0]!
-        XCTAssertTrue(zero.doors[0].destinationRoom === zero)        
+        XCTAssertTrue(zero.doors[0].destinationRoom === zero)
     }
     
     var roomsCount = 3
