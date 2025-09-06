@@ -82,6 +82,32 @@ public final class FindEverythingWorker: Worker {
             }
         }
         
+        func path(to room: ExplorationRoom) -> [Int]? {
+            var queue = [(room: self.rootRoom!, path: [Int]())]
+            var visited = [ExplorationRoom]()
+            
+            while !queue.isEmpty {
+                let (current, path) = queue.removeFirst()
+                if current === room {
+                    return path
+                }
+                if visited.contains(where: { $0 === current }) {
+                    continue
+                }
+                visited.append(current)
+                
+                for door in current.doors {
+                    if let nextRoom = door.destinationRoom {
+                        queue.append((nextRoom, path + [Int(door.id)!]))
+                    }
+                }
+            }
+            
+            return nil
+
+            
+        }
+        
         var foundUniqueRooms: Int = 0
         
         var rootRoom: ExplorationRoom?
@@ -145,13 +171,13 @@ public final class FindEverythingWorker: Worker {
                         {
                             
                             // Collapse here if we found boundeded one
-                            if let index = roomDoorDestinationRoom.index {
-                                print("We found bounded one! change!")
-                                definedRoomDoor.destinationRoom = definedRooms[index]!
-                            } else {
+//                            if let index = roomDoorDestinationRoom.index {
+//                                print("We found bounded one! change!")
+//                                definedRoomDoor.destinationRoom = definedRooms[index]!
+//                            } else {
                                 // Add connection to the defined room from the current room
                                 definedRoomDoor.destinationRoom = roomDoorDestinationRoom
-                            }
+//                            }
                             
                             
                             //                            if definedRoom.path.count > room.path.count {
@@ -168,10 +194,10 @@ public final class FindEverythingWorker: Worker {
                         
                         
                         // Case for self-reference
-                        if definedRoomDoor.destinationRoom === room {
-                            print("Collapsed self-reference for room \(definedRoom) \(room.path)")
-                            definedRoomDoor.destinationRoom = definedRoom
-                        }
+//                        if definedRoomDoor.destinationRoom === room {
+//                            print("Collapsed self-reference for room \(definedRoom) \(room.path)")
+//                            definedRoomDoor.destinationRoom = definedRoom
+//                        }
                         
                     }
                     
@@ -202,9 +228,10 @@ public final class FindEverythingWorker: Worker {
                         
                         // Replace door with defined rooms
                         log3("Replacing door destination room \(String(describing: door.destinationRoom)) with defined room \(idx)")
-                        door.destinationRoom =  definedRooms[idx]!
+//                        door.destinationRoom =  definedRooms[idx]!
                         
-                        // TODO:Potentially, we would need to merge information form the destRoom with a defined one
+                        // TODO:Potentially, we would need to merge information form the destRoom with a defined one <---
+                        
                     }
                 }
             }
@@ -218,7 +245,7 @@ public final class FindEverythingWorker: Worker {
                 guard let definedRoomIndex = definedRoom.index else { continue }
                 guard room.potential.contains(definedRoomIndex) else { continue }
                 
-                if isDifferent(room: room, definedRoom: definedRoom, depth: 3) {
+                if isDifferent(room: room, definedRoom: definedRoom, depth: 5) {
                     room.potential.remove(definedRoomIndex)
                     continue
                 }
@@ -312,7 +339,7 @@ public final class FindEverythingWorker: Worker {
             for door in room.doors {
                 // We need to caclulate all doors that are not moving to defined rooms
                 if let destRoom = door.destinationRoom, destRoom.index == nil {
-                    print("❓Room \(String(describing: room.index)) has door \(door.id) to non-defined room \(destRoom.label) \(destRoom.path) with potential \(destRoom.potential)")
+//                    print("❓Room \(String(describing: room.index)) has door \(door.id) to non-defined room \(destRoom.label) \(destRoom.path) with potential \(destRoom.potential)")
                     undefinedDoors += 1
                 } else {
                     definedDoors += 1
@@ -351,7 +378,8 @@ public final class FindEverythingWorker: Worker {
             print("🍈 Will explore door \(door.id) in room \(room)")
             
             //            for i in 0..<6 {
-            let additionalQuer = room.path + [Int(door.id)!]
+            let path = knownState.path(to: room)
+            let additionalQuer = path! + [Int(door.id)!]
             let additionalQueryString = additionalQuer.map { String($0) }.joined()
             //                + sentQuery
             let final = String(additionalQueryString.prefix(problem.roomsCount * 18))
@@ -417,7 +445,7 @@ public final class FindEverythingWorker: Worker {
         
     }
     
-    private var debugExploration: Bool = true
+    private var debugExploration: Bool = false
     func log2(_ message: @autoclosure () -> String) {
         if debugExploration {
             print("[ProcessExplored] \(message())")
@@ -477,7 +505,7 @@ public final class FindEverythingWorker: Worker {
                     //  0 -0> 1 -5> [*0 -0> 1] ->  unbounded([*])
                     //  0 -1> 2
                     var curr = knownState.rootRoom!
-                    for step in newRoom.path {
+                    for step in currentPath {
                         if let knownDestinationRoom = curr.doors[step].destinationRoom {
                             curr = knownDestinationRoom
                             log2("[1]Current room changed to \(curr)")
