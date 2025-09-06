@@ -1,0 +1,13 @@
+[project]
+name = "pyworker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dataclasses-json>=0.6.7",
+    "httpx>=0.28.1",
+    "mcts>=1.0.4",
+    "numpy>=2.3.2",
+    "python-dotenv>=1.1.1",
+]

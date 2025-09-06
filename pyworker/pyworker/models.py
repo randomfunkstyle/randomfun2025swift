@@ -87,3 +87,4 @@ class HTTPError(Exception):
         self.status_code = status_code
         self.message = message
         super().__init__(f"HTTP Error {status_code}: {message}")
+

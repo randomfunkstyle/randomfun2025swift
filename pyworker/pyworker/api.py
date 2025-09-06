@@ -3,17 +3,22 @@ from typing import TypeVar, Type
 
 from config import Config
 from models import (
-    RegisterRequest, RegisterResponse,
-    SelectRequest, SelectResponse,
-    ExploreRequest, ExploreResponse,
-    GuessRequest, GuessResponse,
-    MapDescription, HTTPError
+    RegisterRequest,
+    RegisterResponse,
+    SelectRequest,
+    SelectResponse,
+    ExploreRequest,
+    ExploreResponse,
+    GuessRequest,
+    GuessResponse,
+    MapDescription,
+    HTTPError,
 )
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
-class HTTPTaskClient:
+class ApiClient:
     def __init__(self, config: Config):
         self.base_url = config.api_url
         self.team_id = config.team_id
@@ -43,18 +48,13 @@ class HTTPTaskClient:
 
     async def _post(self, endpoint: str, body: object, response_type: Type[T]) -> T:
         url = f"{self.base_url}{endpoint}"
-        
+
         response = await self.client.post(
-            url,
-            json=body.to_dict(),
-            headers={"Content-Type": "application/json"}
+            url, json=body.to_dict(), headers={"Content-Type": "application/json"}
         )
 
         if response.status_code != 200:
-            raise HTTPError(
-                status_code=response.status_code,
-                message=response.text
-            )
+            raise HTTPError(status_code=response.status_code, message=response.text)
 
         response_data = response.json()
         return response_type.from_dict(response_data)
