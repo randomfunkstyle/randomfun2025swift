@@ -63,7 +63,7 @@ public struct GuessResponse: Codable {
     public let correct: Bool
 }
 
-public struct MapDescription: Codable {
+public struct MapDescription: Codable, CustomStringConvertible {
     public let rooms: [Int]
     public let startingRoom: Int
     public let connections: [Connection]
@@ -72,6 +72,15 @@ public struct MapDescription: Codable {
         self.rooms = rooms
         self.startingRoom = startingRoom
         self.connections = connections
+    }
+    
+    public var description: String {
+        var desc = "MapDescription(startingRoom: \(startingRoom), rooms: \(rooms), connections: [\n"
+        for connection in connections {
+            desc += "  \(connection)\n"
+        }
+        desc += "])"
+        return desc
     }
 }
 
@@ -85,7 +94,7 @@ public struct Connection: Codable, CustomStringConvertible {
     }
 
     public var description: String {
-        return "Connection(\(from.room).\(from.door), -> \(to.room).\(to.door))"
+        return "🍞(\(from.room).\(from.door) -> \(to.room).\(to.door))"
     }
 }
 

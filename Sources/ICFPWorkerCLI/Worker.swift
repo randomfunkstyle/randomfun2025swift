@@ -17,13 +17,25 @@ struct CountLines: AsyncParsableCommand {
             
             switch workerName {
             case "BasicWorker":
-                try await  GenerateEverythingWorker(problem: .probatio, client: MockExplorationClient(layout: .threeRooms)).run()
+                if #available(macOS 13.0, *) {
+                    try await  BasicWorker(problem: .primus, client: MockExplorationClient(layout: .hexagon)).run()
+//                    try await  BasicWorker(problem: .secundus, client: HTTPExplorationClient(), debug: true).run()
+
+                }
 //                try await  GenerateEverythingWorker(problem: .probatio, client: HTTPExplorationClient()).run()
             case "DeBruijnWorker":
                 if #available(macOS 13.0, *) {
                     try await DeBruijnWorker(problem: .probatio, client: MockExplorationClient(layout: .threeRooms)).run()
 //                    try await DeBruijnWorker(problem: .probatio, client: HTTPExplorationClient()).run()
                 }
+                
+            case "FindEverything":
+                if #available(macOS 13.0, *) {
+//                    try await  FindEverythingWorker(problem: .primus, client: MockExplorationClient(layout: .hexagon), debug: true).run()
+                    try await  FindEverythingWorker(problem: .tertius, client: HTTPExplorationClient(), debug: true).run()
+
+                }
+
             default:
                 print("Unknown worker: \(workerName)")
             }
