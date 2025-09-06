@@ -192,25 +192,10 @@ public final class FindEverythingWorker: Worker {
                 guard let definedRoomIndex = definedRoom.index else { continue }
                 guard room.potential.contains(definedRoomIndex) else { continue }
                 
-                if isDifferen(room: room, definedRoom: definedRoom, depth: 3) {
+                if isDifferen(room: room, definedRoom: definedRoom, depth: 5) {
                     room.potential.remove(definedRoomIndex)
                     continue
                 }
-//                if room.label != definedRoom.label {
-//                    room.potential.remove(definedRoomIndex)
-//                    log4("Defined room was \(definedRoom) vs \(room.label)")
-//                    log4("Removed potential \(definedRoomIndex) from room \(room.label) \(room.path) because of label mismatch ")
-//                    continue
-//                }
-//                
-//                for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
-//                    guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else { continue }
-//                    guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
-//                    if definedRoomDoorDestinationRoom.label != roomDoorDestinationRoom.label {
-//                        room.potential.remove(definedRoomIndex)
-//                        continue
-//                    }
-//                }
             }
         }
         
@@ -300,7 +285,7 @@ public final class FindEverythingWorker: Worker {
         }
                 
         
-        return it < 100
+        return it < 500
     }
     
     //
@@ -312,8 +297,32 @@ public final class FindEverythingWorker: Worker {
     override public func generatePlans() -> [String] {
         let query = String(doorPath(N: problem.roomsCount * iterations))
         let sentQuery = String(query.suffix(problem.roomsCount * 18))
+        
         self.query = [sentQuery]
-        return [sentQuery]
+
+        if let room = knownState.definedRooms.compactMap({ $0}).first(where:{ room in
+            room.doors.contains(where: { $0.destinationRoom == nil })
+        }) {
+            print("🍈 Found oor \(room) with unknown doors")
+            let door = room.doors.first(where: { $0.destinationRoom == nil })!
+            
+            print("🍈 Will explore door \(door.id) in room \(room)")
+            
+            for i in 0..<6 {
+                let additionalQuer = room.path + [Int(door.id)! , i]
+                let additionalQueryString = additionalQuer.map { String($0) }.joined() + sentQuery
+//                + sentQuery
+                let final = String(additionalQueryString.prefix(problem.roomsCount * 18))
+                self.query.append(final)
+            }
+        }
+        
+        if self.query.isEmpty {
+            self.query.append(sentQuery)
+        }
+        
+        
+        return self.query
     }
     
     override public func generateGuess() -> MapDescription {
