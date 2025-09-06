@@ -81,4 +81,84 @@ public class GraphMatcher {
         }
         return convertMapDescriptionToGraph(mapDesc)
     }
+    
+    /// Explore a path through a source graph and return the sequence of room labels observed
+    /// - Parameters:
+    ///   - sourceGraph: The graph to explore
+    ///   - path: Sequence of door numbers to traverse (e.g., "012" means door 0, then 1, then 2)
+    /// - Returns: Array of room labels observed at each step (including starting room)
+    public func explorePath(sourceGraph: Graph, path: String) -> [RoomLabel] {
+        var currentNodeId = sourceGraph.startingNodeId
+        var labels: [RoomLabel] = []
+        
+        // Add starting room label
+        if let startingNode = sourceGraph.getNode(currentNodeId) {
+            labels.append(startingNode.label ?? .A)  // Default to A if no label
+        }
+        
+        // Walk through each door in the path
+        for doorChar in path {
+            guard let door = Int(String(doorChar)), door >= 0 && door < 6 else { continue }
+            
+            // Find where this door leads
+            if let currentNode = sourceGraph.getNode(currentNodeId),
+               let connection = currentNode.doors[door],
+               let (nextNodeId, _) = connection {
+                currentNodeId = nextNodeId
+                
+                // Add the label of the room we entered
+                if let nextNode = sourceGraph.getNode(nextNodeId) {
+                    labels.append(nextNode.label ?? .A)  // Default to A if no label
+                }
+            } else {
+                // If door doesn't exist or leads nowhere, stay in current room
+                if let currentNode = sourceGraph.getNode(currentNodeId) {
+                    labels.append(currentNode.label ?? .A)
+                }
+            }
+        }
+        
+        return labels
+    }
+    
+    /// Build a new graph from exploration results
+    /// - Parameter explorations: Array of tuples containing paths and their observed labels
+    /// - Returns: A new graph constructed from the exploration data
+    public func buildGraphFromExploration(explorations: [(path: String, labels: [RoomLabel])]) -> Graph {
+        // Start with empty graph, using first label if available
+        let startingLabel = explorations.first?.labels.first ?? .A
+        let graph = Graph(startingLabel: startingLabel)
+        
+        // Track current position for each exploration
+        for (path, labels) in explorations {
+            var currentNodeId = graph.startingNodeId
+            
+            // Skip if labels don't match path length + 1 (starting room + each step)
+            guard labels.count == path.count + 1 else { continue }
+            
+            // Process each door in the path
+            for (index, doorChar) in path.enumerated() {
+                guard let door = Int(String(doorChar)), door >= 0 && door < 6 else { continue }
+                
+                // Check if we already know where this door leads
+                if let currentNode = graph.getNode(currentNodeId),
+                   let connection = currentNode.doors[door],
+                   let (nextNodeId, _) = connection {
+                    // Door already explored, just move there
+                    currentNodeId = nextNodeId
+                } else {
+                    // Create new node for this unexplored door
+                    let nextLabel = labels[index + 1]  // Label for the room we're entering
+                    let nextNodeId = graph.addNode(label: nextLabel)
+                    
+                    // Only add a one-way connection since we don't know the return door
+                    graph.addOneWayConnection(fromNodeId: currentNodeId, fromDoor: door, toNodeId: nextNodeId)
+                    
+                    currentNodeId = nextNodeId
+                }
+            }
+        }
+        
+        return graph
+    }
 }

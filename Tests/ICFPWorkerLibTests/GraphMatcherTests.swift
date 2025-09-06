@@ -191,6 +191,121 @@ final class GraphMatcherTests: XCTestCase {
         XCTAssertTrue(labels.contains(.D))
     }
     
+    // MARK: - Exploration Tests
+    
+    func testExplorePath() {
+        let matcher = GraphMatcher()
+        
+        // Create a simple test graph
+        let graph = Graph(startingLabel: .A)
+        let node1 = graph.addNode(label: .B)
+        let node2 = graph.addNode(label: .C)
+        
+        // Connect: starting (A) -door0-> node1 (B) -door1-> node2 (C)
+        graph.addEdge(fromNodeId: graph.startingNodeId, fromDoor: 0, toNodeId: node1, toDoor: 3)
+        graph.addEdge(fromNodeId: node1, fromDoor: 1, toNodeId: node2, toDoor: 4)
+        
+        // Test exploring path "0"
+        let labels1 = matcher.explorePath(sourceGraph: graph, path: "0")
+        XCTAssertEqual(labels1, [.A, .B])
+        
+        // Test exploring path "01"
+        let labels2 = matcher.explorePath(sourceGraph: graph, path: "01")
+        XCTAssertEqual(labels2, [.A, .B, .C])
+        
+        // Test exploring empty path
+        let labels3 = matcher.explorePath(sourceGraph: graph, path: "")
+        XCTAssertEqual(labels3, [.A])
+        
+        // Test exploring non-existent door
+        let labels4 = matcher.explorePath(sourceGraph: graph, path: "5")
+        XCTAssertEqual(labels4, [.A, .A])  // Should stay in same room
+    }
+    
+    func testBuildGraphFromExploration() {
+        let matcher = GraphMatcher()
+        
+        // Simulate exploration results
+        let explorations: [(path: String, labels: [RoomLabel])] = [
+            ("0", [.A, .B]),           // Starting room A, door 0 leads to room B
+            ("1", [.A, .C]),           // Starting room A, door 1 leads to room C
+            ("01", [.A, .B, .D]),      // From A through door 0 to B, then door 1 to D
+        ]
+        
+        let graph = matcher.buildGraphFromExploration(explorations: explorations)
+        
+        // Check starting node
+        XCTAssertEqual(graph.getNode(graph.startingNodeId)?.label, .A)
+        
+        // Check that we have at least 4 nodes (A, B, C, D)
+        XCTAssertGreaterThanOrEqual(graph.getAllNodes().count, 4)
+        
+        // Check that all expected labels exist
+        let allLabels = graph.getAllNodes().compactMap { $0.label }
+        XCTAssertTrue(allLabels.contains(.A))
+        XCTAssertTrue(allLabels.contains(.B))
+        XCTAssertTrue(allLabels.contains(.C))
+        XCTAssertTrue(allLabels.contains(.D))
+    }
+    
+    func testExploreAndRebuildHexagon() {
+        let matcher = GraphMatcher()
+        let sourceGraph = matcher.createHexagonTestGraph()
+        
+        // Explore various paths through the hexagon
+        let explorations: [(path: String, labels: [RoomLabel])] = [
+            ("0", matcher.explorePath(sourceGraph: sourceGraph, path: "0")),
+            ("1", matcher.explorePath(sourceGraph: sourceGraph, path: "1")),
+            ("2", matcher.explorePath(sourceGraph: sourceGraph, path: "2")),
+            ("3", matcher.explorePath(sourceGraph: sourceGraph, path: "3")),
+            ("4", matcher.explorePath(sourceGraph: sourceGraph, path: "4")),
+            ("5", matcher.explorePath(sourceGraph: sourceGraph, path: "5")),
+        ]
+        
+        let rebuiltGraph = matcher.buildGraphFromExploration(explorations: explorations)
+        
+        // Should have created at least 6 nodes (one for each door from starting room)
+        // Note: May have more due to duplicates, which is fine
+        XCTAssertGreaterThanOrEqual(rebuiltGraph.getAllNodes().count, 6)
+        
+        // Starting node should still be A
+        XCTAssertEqual(rebuiltGraph.getNode(rebuiltGraph.startingNodeId)?.label, .A)
+    }
+    
+    func testExploreAndRebuildThreeRooms() {
+        let matcher = GraphMatcher()
+        let sourceGraph = matcher.createThreeRoomsTestGraph()
+        
+        // Explore paths through the three rooms - note that path "55" should go A->B->C
+        let explorations: [(path: String, labels: [RoomLabel])] = [
+            ("5", matcher.explorePath(sourceGraph: sourceGraph, path: "5")),     // Should go to room B
+            ("55", matcher.explorePath(sourceGraph: sourceGraph, path: "55")),   // Should go to room B then C
+            ("0", matcher.explorePath(sourceGraph: sourceGraph, path: "0")),     // Self-loop in room A
+        ]
+        
+        // Verify our exploration results are what we expect
+        XCTAssertEqual(explorations[0].labels, [.A, .B])      // Path "5"
+        XCTAssertEqual(explorations[1].labels, [.A, .B, .C])  // Path "55"
+        XCTAssertEqual(explorations[2].labels, [.A, .A])      // Path "0" (self-loop)
+        
+        let rebuiltGraph = matcher.buildGraphFromExploration(explorations: explorations)
+        
+        // Should have at least 3 nodes (may have more due to duplicates, which is fine)
+        XCTAssertGreaterThanOrEqual(rebuiltGraph.getAllNodes().count, 3)
+        
+        // Check starting node
+        XCTAssertEqual(rebuiltGraph.getNode(rebuiltGraph.startingNodeId)?.label, .A)
+        
+        // Check that we have the expected labels (A, B, and at least one C)
+        let allLabels = rebuiltGraph.getAllNodes().compactMap { $0.label }
+        XCTAssertTrue(allLabels.contains(.A))
+        XCTAssertTrue(allLabels.contains(.B))
+        
+        // Since we're exploring "55" which goes A->B->C, we should have created a C node
+        // Even though it might be a duplicate (not connected back properly)
+        XCTAssertTrue(allLabels.contains(.C), "Missing label C. Path '55' with labels [A,B,C] should create a C node.")
+    }
+    
     func testComplexGraph() {
         let graph = Graph(startingLabel: .A)
         let node1 = graph.addNode(label: .B)

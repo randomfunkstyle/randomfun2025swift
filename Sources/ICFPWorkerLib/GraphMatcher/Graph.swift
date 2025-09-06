@@ -136,4 +136,18 @@ public class Graph {
         node.label = label
         nodes[nodeId] = node
     }
+    
+    /// Add a one-way connection from a node through a door
+    /// Used when we don't know the return path yet
+    public func addOneWayConnection(fromNodeId: Int, fromDoor: Int, toNodeId: Int) {
+        guard var fromNode = nodes[fromNodeId],
+              nodes[toNodeId] != nil,
+              fromDoor >= 0 && fromDoor < 6 else {
+            return
+        }
+        
+        // Only update the forward connection
+        fromNode.doors[fromDoor] = (nodeId: toNodeId, doorNumber: -1)  // -1 means unknown return door
+        nodes[fromNodeId] = fromNode
+    }
 }
