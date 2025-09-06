@@ -64,7 +64,6 @@ public class MockExplorationClient: ExplorationClient {
         connections.connect(room: idx(0), door: 3, toRoom: idx(0), toDoor: 3)
         connections.connect(room: idx(0), door: 4, toRoom: idx(0), toDoor: 4)
         connections.connect(room: idx(0), door: 5, toRoom: idx(1), toDoor: 0)
-        // 0 -5> 1
 
         // connections.connect(room: idx(1), door: 0, toRoom: idx(0), toDoor: 5)
         connections.connect(room: idx(1), door: 1, toRoom: idx(1), toDoor: 1)
@@ -72,7 +71,6 @@ public class MockExplorationClient: ExplorationClient {
         connections.connect(room: idx(1), door: 3, toRoom: idx(1), toDoor: 3)
         connections.connect(room: idx(1), door: 4, toRoom: idx(1), toDoor: 4)
         connections.connect(room: idx(1), door: 5, toRoom: idx(2), toDoor: 0)
-        // 1 -5> 2
 
         // connections.connect(room: idx(2), door: 0, toRoom: idx(1), toDoor: 5)
         connections.connect(room: idx(2), door: 1, toRoom: idx(2), toDoor: 1)
@@ -80,7 +78,6 @@ public class MockExplorationClient: ExplorationClient {
         connections.connect(room: idx(2), door: 3, toRoom: idx(2), toDoor: 3)
         connections.connect(room: idx(2), door: 4, toRoom: idx(2), toDoor: 4)
         connections.connect(room: idx(2), door: 5, toRoom: idx(2), toDoor: 5)
-        // 2 -0> 0
 
         return MapDescription(rooms: roomLabels, startingRoom: idx(0), connections: connections)
     }
@@ -278,6 +275,11 @@ public class MockExplorationClient: ExplorationClient {
     public func submitGuess(map: MapDescription) async throws -> GuessResponse {
         if let correct = correctMap {
             let isCorrect = mapsAreEquivalent(map1: map, map2: correct)
+
+            print("Correct map:")
+            correct.printMatrix()
+            print("Submitted map:")
+            map.printMatrix()
             return GuessResponse(correct: isCorrect)
         }
 
