@@ -5,7 +5,7 @@ public class Worker {
     let problem: Problem
     let client: ExplorationClient
 
-    private var iterations: Int = 0
+    private(set) var iterations: Int = 0
 
     public init(problem: Problem, client: ExplorationClient) {
         self.client = client
