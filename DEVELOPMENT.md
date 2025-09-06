@@ -250,9 +250,9 @@ enum ValidationResult {
 - `testHandlesZeroExpected()`
 - `testValidationMessage()` - Helpful error messages
 
-## 8. Orchestration Layer
+## 8. Orchestration Layer ✅
 
-### `shouldContinueExploration(state: ExplorationState) -> Decision`
+### `shouldContinueExploration(state: ExplorationState) -> Decision` ✅
 **Responsibility**: Decide whether to continue exploring
 
 **Contract**:
@@ -281,8 +281,8 @@ enum Decision {
 - `testProvidesReasons()`
 - `testHandlesInvalidState()`
 
-### `selectNextExplorations(state: ExplorationState, graph: Graph, labelGroups: [PriorityGroup]) -> [(NodeId, [String])]`
-**Responsibility**: Choose what to explore next
+### `selectNextExplorations(state: ExplorationState, graph: Graph, labelGroups: [PriorityGroup]) -> [String]` ✅
+**Responsibility**: Choose what paths to explore next from starting node
 
 **Strategy**: 
 1. High priority groups first

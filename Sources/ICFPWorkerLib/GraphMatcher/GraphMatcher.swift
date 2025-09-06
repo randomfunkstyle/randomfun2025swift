@@ -1,5 +1,20 @@
 import Foundation
 
+/// Represents the result of room identification
+public struct RoomIdentificationResult {
+    public let uniqueRooms: Int
+    public let roomGroups: [[Int]]  // Groups of node IDs that are the same room
+    public let queryCount: Int
+    public let graph: Graph
+    
+    public init(uniqueRooms: Int, roomGroups: [[Int]], queryCount: Int, graph: Graph) {
+        self.uniqueRooms = uniqueRooms
+        self.roomGroups = roomGroups
+        self.queryCount = queryCount
+        self.graph = graph
+    }
+}
+
 /// GraphMatcher is responsible for matching and comparing graph structures
 public class GraphMatcher {
     
@@ -161,4 +176,288 @@ public class GraphMatcher {
         
         return graph
     }
+    
+    /// Main entry point for room identification algorithm
+    /// - Parameters:
+    ///   - sourceGraph: The actual graph to explore (typically via API)
+    ///   - expectedRoomCount: Number of unique rooms expected
+    ///   - maxQueries: Maximum number of exploration queries allowed
+    ///   - maxDepth: Maximum exploration depth for paths
+    /// - Returns: Result containing unique rooms, node groupings, and statistics
+    public func identifyRooms(
+        sourceGraph: Graph,
+        expectedRoomCount: Int,
+        maxQueries: Int = 100,
+        maxDepth: Int = 3
+    ) -> RoomIdentificationResult {
+        
+        var queryCount = 0
+        var exploredPaths = Set<String>()
+        var allResults: [PathResult] = []  // Track all exploration results
+        var roomCollection = SimpleRoomCollection()
+        var currentDepth = 1
+        
+        // Main exploration loop - continue until all rooms are fully characterized
+        while queryCount < maxQueries {  // Respect the query limit
+            
+            // We don't need to check depth limit in the loop condition
+            // The algorithm should explore as deep as needed
+            
+            // Phase 2: Adaptive exploration based on current signature state
+            var pathsToExplore: [String] = []
+            
+            if queryCount == 0 {
+                // Initial exploration: discover immediate neighbors
+                pathsToExplore = ["0", "1", "2", "3", "4", "5"]
+                print("Initial exploration: discovering immediate neighbors")
+            } else {
+                // After initial exploration, systematically explore deeper until all rooms are complete
+                roomCollection = buildSimpleRooms(from: allResults)
+                let incompleteRooms = roomCollection.getAllRooms().filter { !$0.isComplete }
+                
+                print("After \(queryCount) queries: \(roomCollection.getAllRooms().count) rooms discovered, \(incompleteRooms.count) incomplete, depth=\(currentDepth)")
+                
+                // Show some details about incomplete rooms
+                if incompleteRooms.count <= 5 {
+                    for room in incompleteRooms.prefix(3) {
+                        let signature = room.getSignature(depth: 1, roomCollection: roomCollection)
+                        print("  Incomplete: \(signature)")
+                    }
+                }
+                
+                // Check if we have enough unique signatures among complete rooms
+                let uniqueSignatures = roomCollection.countUniqueSignatures()
+                if uniqueSignatures == expectedRoomCount {
+                    print("SUCCESS: Found \(uniqueSignatures) unique room signatures!")
+                    break
+                }
+                
+                if incompleteRooms.isEmpty {
+                    // All discovered rooms are complete but we don't have enough unique signatures
+                    print("All rooms complete but only have \(uniqueSignatures), need \(expectedRoomCount) - exploring deeper")
+                    currentDepth += 1
+                    pathsToExplore = generateAllPathsAtDepth(depth: currentDepth, exploredPaths: exploredPaths)
+                    if pathsToExplore.count > 500 {
+                        pathsToExplore = Array(pathsToExplore.prefix(500))
+                        print("LIMITED to 500 paths to avoid excessive exploration")
+                    }
+                } else {
+                    // Some rooms are incomplete - continue expanding but only if we need more unique signatures
+                    if uniqueSignatures < expectedRoomCount {
+                        currentDepth += 1
+                        pathsToExplore = generateAllPathsAtDepth(depth: currentDepth, exploredPaths: exploredPaths)
+                        print("Have \(uniqueSignatures) unique signatures, need \(expectedRoomCount) - expanding to depth \(currentDepth): \(pathsToExplore.count) new paths")
+                    
+                        // Safety limit to prevent exponential explosion
+                        if pathsToExplore.count > 500 {
+                            pathsToExplore = Array(pathsToExplore.prefix(500))
+                            print("LIMITED to 500 paths to avoid excessive exploration")
+                        }
+                        
+                        // Safety check - if depth gets too high, something is wrong
+                        if currentDepth > 6 {
+                            print("ERROR: Reached depth \(currentDepth) - something may be wrong with exploration")
+                            break
+                        }
+                    } else {
+                        // We have enough unique signatures, even though some rooms are incomplete
+                        print("Have \(uniqueSignatures) unique signatures (target: \(expectedRoomCount)) - stopping even with \(incompleteRooms.count) incomplete rooms")
+                        break
+                    }
+                }
+            }
+            
+            if pathsToExplore.isEmpty {
+                print("No paths available to explore, stopping")
+                break
+            }
+            
+            print("Exploring \(pathsToExplore.count) paths: \(pathsToExplore.prefix(5))...")
+            
+            // Phase 3: Execute exploration
+            // We always explore from the starting node
+            // Respect the query limit
+            let remainingQueries = maxQueries - queryCount
+            let pathsToProcess = Array(pathsToExplore.prefix(remainingQueries))
+            if pathsToProcess.count < pathsToExplore.count {
+                print("Query limit reached: processing \(pathsToProcess.count) of \(pathsToExplore.count) paths")
+            }
+            let explorations = [(nodeId: sourceGraph.startingNodeId, paths: pathsToProcess)]
+            let batchResults = batchExplore(
+                explorations: explorations,
+                sourceGraph: sourceGraph
+            )
+            
+            // Update tracking
+            for result in batchResults {
+                exploredPaths.insert(result.path)
+                allResults.append(result)  // Keep all results
+            }
+            queryCount += batchResults.count
+            
+            // Phase 4: Update room collection from all results
+            roomCollection = buildSimpleRooms(from: allResults)
+            
+            // Phase 5: Check if we've found all rooms
+            let uniqueRooms = roomCollection.countUniqueSignatures()
+            
+            // Check if we've found EXACTLY the right number of unique rooms
+            if uniqueRooms == expectedRoomCount {
+                // Success! Return a simplified result
+                // For compatibility, create groups where each unique room is its own group
+                var roomGroups: [[Int]] = []
+                for i in 0..<uniqueRooms {
+                    roomGroups.append([i])
+                }
+                
+                // Create a dummy graph for backward compatibility
+                let dummyGraph = Graph(startingLabel: sourceGraph.getNode(sourceGraph.startingNodeId)?.label ?? .A)
+                
+                return RoomIdentificationResult(
+                    uniqueRooms: uniqueRooms,
+                    roomGroups: roomGroups,
+                    queryCount: queryCount,
+                    graph: dummyGraph
+                )
+            }
+            
+            // Continue exploring if we don't have enough rooms yet
+            if uniqueRooms < expectedRoomCount {
+                print("Need to continue exploring: have \(uniqueRooms), need \(expectedRoomCount)")
+            }
+        }
+        
+        // Final room computation
+        roomCollection = buildSimpleRooms(from: allResults)
+        let finalUniqueRooms = roomCollection.countUniqueSignatures()
+        
+        // For compatibility, create groups where each unique room is its own group
+        var finalRoomGroups: [[Int]] = []
+        for i in 0..<finalUniqueRooms {
+            finalRoomGroups.append([i])
+        }
+        
+        // Create a dummy graph for backward compatibility
+        let dummyGraph = Graph(startingLabel: sourceGraph.getNode(sourceGraph.startingNodeId)?.label ?? .A)
+        
+        return RoomIdentificationResult(
+            uniqueRooms: finalUniqueRooms,
+            roomGroups: finalRoomGroups,
+            queryCount: queryCount,
+            graph: dummyGraph
+        )
+    }
+    
+    /// Select paths to complete room exploration - expand all 6 doors from each discovered room
+    private func selectPathsForSimpleRooms(
+        roomCollection: SimpleRoomCollection,
+        exploredPaths: Set<String>,
+        currentDepth: Int,
+        maxPathsToExplore: Int
+    ) -> [String] {
+        var pathsToExplore: [String] = []
+        
+        // Strategy: For every incomplete room, find a path to it and expand all 6 doors from there
+        let incompleteRooms = roomCollection.getAllRooms().filter { !$0.isComplete }
+        
+        print("Found \(incompleteRooms.count) incomplete rooms that need door expansion")
+        
+        if !incompleteRooms.isEmpty {
+            // Find paths that lead to each incomplete room and expand from there
+            pathsToExplore = generatePathsToCompleteRooms(
+                incompleteRooms: incompleteRooms,
+                exploredPaths: exploredPaths,
+                maxPaths: maxPathsToExplore
+            )
+            
+            if !pathsToExplore.isEmpty {
+                print("Generated \(pathsToExplore.count) paths to complete room doors: \(pathsToExplore.prefix(6))")
+                return pathsToExplore
+            }
+        }
+        
+        // If no incomplete rooms or no paths to complete them, explore deeper to find new rooms
+        let deeperDepth = max(currentDepth + 1, 2)
+        let deeperPaths = generatePaths(depth: deeperDepth)
+            .filter { !exploredPaths.contains($0) }
+            .prefix(maxPathsToExplore)
+        
+        pathsToExplore = Array(deeperPaths)
+        print("Need to discover new rooms - exploring depth \(deeperDepth) with \(pathsToExplore.count) paths")
+        return pathsToExplore
+    }
+    
+    /// Generate paths to complete the doors of incomplete rooms
+    private func generatePathsToCompleteRooms(
+        incompleteRooms: [SimpleRoom],
+        exploredPaths: Set<String>,
+        maxPaths: Int
+    ) -> [String] {
+        var pathsToExplore: [String] = []
+        
+        // For each incomplete room, we need to find paths that reach it
+        // and then explore all 6 doors from that position
+        
+        // Start with simple approach: if we found rooms at depth 1, expand them to depth 2
+        // Room A is at "", Room B is at "5", Room C is at "55", etc.
+        
+        // First, generate all unexplored paths that could complete room information
+        // Focus on depth 2 first (most rooms are discovered at depth 1-2)
+        for firstDoor in 0..<6 {
+            for secondDoor in 0..<6 {
+                let path = "\(firstDoor)\(secondDoor)"
+                if !exploredPaths.contains(path) && pathsToExplore.count < maxPaths {
+                    pathsToExplore.append(path)
+                }
+            }
+        }
+        
+        // If we still need more paths and have room, try depth 3
+        if pathsToExplore.count < maxPaths {
+            for firstDoor in 0..<6 {
+                for secondDoor in 0..<6 {
+                    for thirdDoor in 0..<6 {
+                        let path = "\(firstDoor)\(secondDoor)\(thirdDoor)"
+                        if !exploredPaths.contains(path) && pathsToExplore.count < maxPaths {
+                            pathsToExplore.append(path)
+                        }
+                        
+                        if pathsToExplore.count >= maxPaths {
+                            break
+                        }
+                    }
+                    if pathsToExplore.count >= maxPaths {
+                        break
+                    }
+                }
+                if pathsToExplore.count >= maxPaths {
+                    break
+                }
+            }
+        }
+        
+        return pathsToExplore
+    }
+    
+    /// Generate all possible paths at a specific depth that haven't been explored yet
+    private func generateAllPathsAtDepth(depth: Int, exploredPaths: Set<String>) -> [String] {
+        var paths: [String] = []
+        
+        func generateRecursive(currentPath: String, remainingDepth: Int) {
+            if remainingDepth == 0 {
+                if !exploredPaths.contains(currentPath) {
+                    paths.append(currentPath)
+                }
+                return
+            }
+            
+            for door in 0..<6 {
+                generateRecursive(currentPath: currentPath + String(door), remainingDepth: remainingDepth - 1)
+            }
+        }
+        
+        generateRecursive(currentPath: "", remainingDepth: depth)
+        return paths
+    }
+    
 }

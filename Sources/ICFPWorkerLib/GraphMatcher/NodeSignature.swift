@@ -44,13 +44,18 @@ extension GraphMatcher {
                 }
                 
                 // Find where this door leads
-                if let currentNode = graph.getNode(currentNodeId),
-                   let connection = currentNode.doors[door],
-                   let (nextNodeId, _) = connection {
-                    currentNodeId = nextNodeId
+                if let currentNode = graph.getNode(currentNodeId) {
+                    // Check if door has a connection
+                    if let connection = currentNode.doors[door],
+                       let (nextNodeId, _) = connection {
+                        currentNodeId = nextNodeId
+                    } else {
+                        // No connection for this door
+                        validPath = false
+                        break
+                    }
                 } else {
-                    // Path cannot be followed from this node in the current built graph
-                    // This is OK - it means we haven't explored this path yet
+                    // Node doesn't exist
                     validPath = false
                     break
                 }
@@ -107,6 +112,7 @@ extension GraphMatcher {
             }
             hashGroups[hash]?.append(signature.nodeId)
         }
+        
         
         // Convert to array of arrays, sorted for consistency
         let groups = hashGroups.values.map { nodeIds in
