@@ -92,7 +92,6 @@ public final class FindEverythingWorker: Worker {
                     // We need to caclulate all doors that are not moving to defined rooms
                     if let destRoom = door.destinationRoom {
                         if destRoom.index == nil {
-                            //                    print("❓Room \(String(describing: room.index)) has door \(door.id) to non-defined room \(destRoom.label) \(destRoom.path) with potential \(destRoom.potential)")
                             undefinedDoors += 1
                         } else {
                             definedDoors += 1
@@ -100,11 +99,6 @@ public final class FindEverythingWorker: Worker {
                     }
                 }
             }
-            
-            //            if undefinedDoors != 0 {
-            //                print("😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors")
-            //            }
-            
             return (definedDoors, undefinedDoors)
         }
         
@@ -128,10 +122,59 @@ public final class FindEverythingWorker: Worker {
                     }
                 }
             }
-            
             return nil
+        }
+        
+        func updatePaths() {
+            guard let startingPoint = rootRoom else { return}
             
-            
+            var queue = [(room: startingPoint, path: [Int]())]
+            var visited = [ExplorationRoom]()
+            while !queue.isEmpty {
+                let (current, path) = queue.removeFirst()
+                current.path = path
+                visited.append(current)
+                for door in current.doors {
+                    if let nextRoom = door.destinationRoom {
+                        if visited.contains(where: { $0 === nextRoom }) {
+                            continue
+                        }
+                        queue.append((nextRoom, path + [Int(door.id)!]))
+                    }
+                }
+            }
+        }
+        
+        func findTopRooms(n: Int) -> [ExplorationRoom] {
+            guard let startingPoint = rootRoom else { return [] }
+            var queue = [(room: startingPoint, path: [Int]())]
+            var visited = [ExplorationRoom]()
+            var topRooms = [ExplorationRoom]()
+            while !queue.isEmpty {
+                let (current, path) = queue.removeFirst()
+                visited.append(current)
+                
+                if current.index == nil && current.doors.contains(where: { $0.destinationRoom == nil }) {
+                    topRooms.append(current)
+                    
+                    if topRooms.count >= n * 2 {
+                        topRooms.sort(by: {
+                            $0.potential.count < $1.potential.count || ($0.potential.count == $1.potential.count && $0.path.count < $1.path.count)
+                        })
+                        topRooms = Array(topRooms.prefix(n))
+                    }
+                }
+                for door in current.doors {
+                    if let nextRoom = door.destinationRoom {
+                        if visited.contains(where: { $0 === nextRoom }) {
+                            continue
+                        }
+                        queue.append((nextRoom, path + [Int(door.id)!]))
+                    }
+                }
+            }
+            topRooms = Array(topRooms.prefix(n))
+            return topRooms
         }
         
         var foundUniqueRooms: Int = 0
@@ -365,7 +408,58 @@ public final class FindEverythingWorker: Worker {
     
     private var submittedQueries: [String] = []
     
+    
+    
+    public func fancygeneratePlans() -> [String] {
+        knownState.updatePaths()
+        
+        var randomQuery = ""
+        for _ in 0..<(problem.roomsCount * 6) {
+            randomQuery += String(Int.random(in: 0..<6))
+        }
+        let sentQuery = randomQuery
+        
+        let lastSubmitted = self.submittedQueries
+        self.submittedQueries = []
+        
+        let allInterestingRooms = knownState.findTopRooms(n: 5)
+        
+        for room in allInterestingRooms {
+            
+            print("🍈 Found oor \(room) with unknown doors")
+            if let door = room.doors.filter({ $0.destinationRoom == nil }).randomElement() {
+                print("🍈 Will explore door \(door.id) in room \(room)")
+                
+                var randomQuery = ""
+                for _ in 0..<(problem.roomsCount * 6) {
+                    randomQuery += String(Int.random(in: 0..<6))
+                }
+                
+                if let path = knownState.path(to: room) {
+                    let additionalQuer = path + [Int(door.id)!]
+                    let additionalQueryString = additionalQuer.map { String($0) }.joined()
+                    + randomQuery
+                    let final = String(additionalQueryString.prefix(problem.roomsCount * 6))
+                    self.submittedQueries.append(final)
+                }
+            }
+        }
+        
+        if self.submittedQueries.isEmpty {
+            self.submittedQueries.append(sentQuery)
+        }
+        
+        
+        if lastSubmitted == self.submittedQueries {
+            print("This is the end of the world, no new queries to submit")
+        }
+        
+        return self.submittedQueries
+    }
+    
+    // TODO: Remove this
     override public func generatePlans() -> [String] {
+        knownState.updatePaths()
         var randomQuery = ""
         for _ in 0..<(problem.roomsCount * 6) {
             randomQuery += String(Int.random(in: 0..<6))
@@ -377,7 +471,7 @@ public final class FindEverythingWorker: Worker {
         
         // 12-N
         
-        if let room = knownState.definedRooms.compactMap({ $0}).first(where:{ room in
+        if let room = knownState.definedRooms.compactMap({ $0}).sorted(by: { $0.path.count < $1.path.count }).first(where:{ room in
             room.doors.contains(where: { $0.destinationRoom == nil })
         }) {
             print("🍈 Found oor \(room) with unknown doors")
@@ -402,9 +496,8 @@ public final class FindEverythingWorker: Worker {
         }
         
         if self.submittedQueries.isEmpty {
-            self.submittedQueries.append(sentQuery)
+            return fancygeneratePlans()
         }
-        
         
         if lastSubmitted == self.submittedQueries {
             print("This is the end of the world, no new queries to submit")
@@ -548,4 +641,24 @@ public final class FindEverythingWorker: Worker {
         
         log2("Known state: \(knownState)")
     }
+}
+
+import AppKit
+
+func measureTwoVariants<T: Equatable>(_ name: String, _ first: @autoclosure () -> T, _ name2: String, _ second: @autoclosure () -> T) -> T {
+    let start = Date()
+    let result = first()
+    let duration = Date().timeIntervalSince(start)
+    print("\(name) took \(duration) seconds")
+    let start2 = Date()
+    let result2 = second()
+    let duration2 = Date().timeIntervalSince(start2)
+    print("\(name2) took \(duration2) seconds")
+    
+    // Which is faster and by how much in percentage?
+    let percentage = abs(duration2 - duration) / max(duration, duration2) * 100
+    let fasterVariant = duration < duration2 ? name : name2
+    print("\(fasterVariant) is faster by \(percentage)%")
+    assert(result == result2)
+    return result
 }
