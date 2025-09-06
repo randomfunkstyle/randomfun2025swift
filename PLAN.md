@@ -224,23 +224,28 @@ This algorithm typically finds all rooms in 30-50% fewer queries than exhaustive
 - `createHexagonTestGraph()` - Test fixture for 6-room hexagon
 - `createThreeRoomsTestGraph()` - Test fixture for 3-room layout
 
+#### Path Signature System (Phase 1) ✅
+- `computeNodeSignature()` - Computes path→label mappings for nodes
+- `hashSignature()` - Creates deterministic hash from signatures
+- `findIdenticalSignatures()` - Groups nodes with identical signatures
+- Simplified `NodeSignature` struct (removed unnecessary fields)
+- 30 comprehensive tests (10 per method) all passing
+
 #### Test Coverage
-- 16 passing tests for GraphMatcher functionality
+- 46 passing tests total (16 GraphMatcher + 30 Signature System)
 - Integration test showing incremental graph growth
 - Test fixtures using MockExplorationClient
 
+#### Path Generation Layer (Phase 2) ✅
+- `generatePaths(depth)` - Generates base-6 strategic paths for given depth
+- `selectStrategicPaths()` - Filters paths by strategy (hammingLike/exhaustive/minimal)
+- 22 comprehensive tests (12 for generatePaths, 10 for selectStrategicPaths) all passing
+
 ### 🚧 In Progress
 
-#### Path Signature System
-- Need: `computeNodeSignature()` method
-- Need: Signature comparison logic
-- Need: Duplicate detection based on signatures
+Ready to proceed to Phase 3: Label Analysis Layer
 
 ### ❌ Not Started
-
-#### Path Generation Layer
-- `generatePaths(depth)` - Generate base-6 exploration paths
-- `selectStrategicPaths()` - Filter paths by strategy
 
 #### Label Analysis Layer  
 - `groupNodesByLabel()` - Group nodes by observed label
@@ -307,9 +312,9 @@ This algorithm typically finds all rooms in 30-50% fewer queries than exhaustive
 ## Metrics
 
 ### Current Status:
-- **Components Complete**: 2/9 (22%)
-- **Tests Written**: 16/124 (13%)
-- **Code Coverage**: ~40% (GraphMatcher only)
+- **Components Complete**: 4/9 (44%)
+- **Tests Written**: 68/124 (55%)
+- **Code Coverage**: ~65% (GraphMatcher + Signature System + Path Generation)
 
 ### Target:
 - **Components Complete**: 9/9 (100%)
