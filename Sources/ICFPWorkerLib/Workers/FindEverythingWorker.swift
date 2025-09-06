@@ -293,7 +293,6 @@ public final class FindEverythingWorker: Worker {
     }
     
     override public func generateGuess() -> MapDescription {
-        let rooms = knownState.definedRooms.compactMap { $0?.index }
         let allRooms = knownState.definedRooms.compactMap { $0}
         
         for room in allRooms {
