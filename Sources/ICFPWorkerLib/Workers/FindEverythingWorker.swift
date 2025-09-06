@@ -28,13 +28,22 @@ public final class FindEverythingWorker: Worker {
         init(label: Int, path: [Int], roomsCount: Int) {
             self.label = label
             self.path = path
+            
+            var potential = Set<Int>()
             for i in 0 ..< roomsCount {
                 potential.insert(i)
             }
+            self.potential = potential
         }
     }
 
     private class KnownState {
+        let totalRoomsCount: Int
+
+        init(totalRoomsCount: Int) {
+            self.totalRoomsCount = totalRoomsCount
+        }
+
         private var debug: Bool = true
         func log(_ message: @autoclosure () -> String) {
             if debug {
@@ -50,24 +59,132 @@ public final class FindEverythingWorker: Worker {
 
         var allVisitedRooms: [ExplorationRoom] = []
 
-        func addRoom(_ room: ExplorationRoom) {
-            if allVisitedRooms.isEmpty {
-                allVisitedRooms.append(room)
-                rootRoom = room
-                room.potential = Set([foundUniqueRooms])
-                foundUniqueRooms += 1
-                definedRooms[room.index!] = room
+        func addRoomAndCompactRooms(_ room: ExplorationRoom) {
+            addRoom(room)
+            log("Total unique rooms found: \(foundUniqueRooms)/\(allVisitedRooms.count)")
+            compactRooms()
+        
+            log("[Compact]iue rooms found: \(foundUniqueRooms)/\(allVisitedRooms.count)")
+        }
 
-                log("Added unique room: \(room.index!)")
+        private func compactRooms() {
+            // Task for compact is to simplify allVisitedRooms by changinf those to defined once and cleanup
+            var newAllVisitedRooms: [ExplorationRoom] = []
+
+            for room in allVisitedRooms {
+                removeAllPotentialIndexes(room)
+            }
+
+            for room in allVisitedRooms {
+
+                guard let index = room.index  else {
+                    newAllVisitedRooms.append(room)
+                    continue
+                }
+                
+
+                // Merge information with the defined room, if we know everything about it
+                if let definedRoom = definedRooms[index] {
+                    for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
+                        if let roomDoorDestinationRoom = roomDoor.destinationRoom, definedRoomDoor.destinationRoom == nil
+                        {
+                            // Add connection to the defined room from the current room
+                            definedRoomDoor.destinationRoom = roomDoorDestinationRoom
+                        }
+                    }
+                } else {
+                    
+                    // This is a new unique room found
+                    log("Found new unique room: \(room.label) \(room.path)")
+                    room.potential = Set([foundUniqueRooms])
+                    foundUniqueRooms += 1
+                    definedRooms[room.index!] = room
+                    log("Added unique room: with \(room.index!)")
+                }
+                
+            }
+
+            // Replace all destinationRooms to defined rooms, if possible
+            for definedRoom in definedRooms {
+                if let definedRoom = definedRoom {
+                    for door in definedRoom.doors {
+                        guard let destRoom = door.destinationRoom else { continue }
+                        guard !definedRooms.contains(where: { $0 === destRoom }) else { continue }
+
+                        removeAllPotentialIndexes(destRoom)
+
+                        if let idx = destRoom.index {
+                            // Replace door with defined rooms
+                            door.destinationRoom =  definedRooms[idx]!
+
+                            // TODO:Potentially, we would need to merge information form the destRoom with a defined one
+                        }
+                    }
+                }
+            }
+            
+            allVisitedRooms = newAllVisitedRooms
+        }
+
+        private func removeAllPotentialIndexes(_ room: ExplorationRoom) {
+            for definedRoom in definedRooms {
+                guard let definedRoom = definedRoom else { continue }
+                guard let definedRoomIndex = definedRoom.index else { continue }
+                guard room.potential.contains(definedRoomIndex) else { continue }
+
+                if room.label != definedRoom.label {
+                    room.potential.remove(definedRoomIndex)
+                    continue
+                }
+
+                for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
+                    guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else { continue }
+                    guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
+                    if definedRoomDoorDestinationRoom.label != roomDoorDestinationRoom.label {
+                        room.potential.remove(definedRoomIndex)
+                        continue
+                    }
+                }
+            }
+        }
+
+        private func addRoom(_ room: ExplorationRoom) {
+//            if allVisitedRooms.isEmpty {
+//                allVisitedRooms.append(room)
+//                room.potential = Set([foundUniqueRooms])
+//                foundUniqueRooms += 1
+//                definedRooms[room.index!] = room
+//
+//                log("Added unique room: \(room.index!)")
+//                rootRoom = room
+//                return
+//            }
+
+            // We aleread know averything about this
+            // Post process other visited rooms
+            if let _ = room.index {
                 return
             }
 
-            // if this room 1000% unique, we need to set index to it and update all other rooms
-            definedRooms[room.label] = room
+            allVisitedRooms.append(room)
+
+            removeAllPotentialIndexes(room)
+
+
+            // Is it still potential?
+            if room.potential.count <= totalRoomsCount - foundUniqueRooms {
+                // This is a new unique room found
+                log("Found new unique room: \(room.label) \(room.path)")
+                room.potential = Set([foundUniqueRooms])
+                foundUniqueRooms += 1
+                definedRooms[room.index!] = room
+                log("Added unique room: with \(room.index!)")
+                return
+            }
         }
     }
 
-    private var knownState: KnownState = .init()
+    private var knownState: KnownState
 
     private var debug: Bool = true
     func log(_ message: @autoclosure () -> String) {
@@ -77,12 +194,13 @@ public final class FindEverythingWorker: Worker {
     }
 
     public init(problem: Problem, client: ExplorationClient, debug: Bool = false) {
+        self.knownState = KnownState(totalRoomsCount: problem.roomsCount)
         super.init(problem: problem, client: client)
         self.debug = debug
     }
 
     override public func shouldContinue(iterations it: Int) -> Bool {
-        knownState.uniqueRoomsCount < problem.roomsCount && it < 2
+        knownState.foundUniqueRooms < problem.roomsCount && it < 2
     }
 
     private var query: [String] = []
@@ -95,16 +213,20 @@ public final class FindEverythingWorker: Worker {
     override public func generateGuess() -> MapDescription {
         return MapDescription(rooms: [], startingRoom: 0, connections: [])
     }
+    
+    private func createExplorationRoom(label: Int, path: [Int]) -> ExplorationRoom {
+        return ExplorationRoom(label: label, path: path, roomsCount: problem.roomsCount)
+    }
 
     override public func processExplored(explored: ExploreResponse) {
         for (query, result) in zip(query, explored.results) {
             let querySteps = query.split(separator: "").map { Int(String($0))! }
 
             var currentPath: [Int] = []
-            var currentRoom: ExplorationRoom = knownState.rootRoom ?? ExplorationRoom(label: result[0], path: [])
+            var currentRoom: ExplorationRoom = knownState.rootRoom ?? createExplorationRoom(label: result[0], path: [])
             if knownState.rootRoom == nil {
                 knownState.rootRoom = currentRoom
-                knownState.addRoom(currentRoom)
+                knownState.addRoomAndCompactRooms(currentRoom)
             }
 
             for i in 0 ..< querySteps.count {
@@ -118,17 +240,16 @@ public final class FindEverythingWorker: Worker {
                 if let destinationRoom = door.destinationRoom {
                     currentRoom = destinationRoom
                 } else {
-                    let newRoom = ExplorationRoom(label: toRoom, path: currentPath)
-                    knownState.roomsByPath[currentPath] = newRoom
+                    let newRoom = createExplorationRoom(label: toRoom, path: currentPath)
                     door.destinationRoom = newRoom
+                    
                     print("Added new room: \(newRoom.path) -> \(newRoom.label)")
                     print("Added connection: \(fromRoom)[\(fromDoor)]->\(toRoom)")
-                    knownState.addRoom(currentRoom)
+                    
+                    knownState.addRoomAndCompactRooms(currentRoom)
 
                     currentRoom = newRoom
                 }
-
-                knownState.addRoom(currentRoom)
             }
         }
 
