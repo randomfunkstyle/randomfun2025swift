@@ -31,8 +31,8 @@ struct CountLines: AsyncParsableCommand {
                 
             case "FindEverything":
                 if #available(macOS 13.0, *) {
-                    try await  FindEverythingWorker(problem: .primus, client: MockExplorationClient(layout: .hexagon), debug: true).run()
-//                    try await  FindEverythingWorker(problem: .secundus, client: HTTPExplorationClient(), debug: true).run()
+//                    try await  FindEverythingWorker(problem: .primus, client: MockExplorationClient(layout: .hexagon), debug: true).run()
+                    try await  FindEverythingWorker(problem: .primus, client: HTTPExplorationClient(), debug: true).run()
 
                 }
 

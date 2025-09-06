@@ -66,6 +66,21 @@ public final class FindEverythingWorker: Worker {
             }
         }
         
+        private var debugCompact: Bool = false
+        func log3(_ message: @autoclosure () -> String) {
+            if debugCompact {
+                print("[Compact] \(message())")
+            }
+        }
+        
+        private var debugCleanup: Bool = false
+        func log4(_ message: @autoclosure () -> String) {
+            if debugCleanup {
+                print("[Cleanup] \(message())")
+            }
+        }
+
+        
         var definedRooms: [ExplorationRoom?] = Array(repeating: nil, count: 64)
         
         var foundUniqueRooms: Int = 0
@@ -76,10 +91,10 @@ public final class FindEverythingWorker: Worker {
         
         func addRoomAndCompactRooms(_ room: ExplorationRoom) {
             addRoom(room)
-            log("Total unique rooms found: \(foundUniqueRooms)/\(unboundedRooms.count)")
+//            log("Total unique rooms found: \(foundUniqueRooms)/\(unboundedRooms.count)")
             compactRooms()
             
-            log("[Compact]iue rooms found: \(foundUniqueRooms)/\(unboundedRooms.count)")
+//            log("[Compact]iue rooms found: \(foundUniqueRooms)/\(unboundedRooms.count)")
         }
         
         private func compactRooms() {
@@ -160,7 +175,7 @@ public final class FindEverythingWorker: Worker {
                         // --> Door -> DestionRoom
   
                         // Replace door with defined rooms
-                        print("Replacing door destination room \(String(describing: door.destinationRoom)) with defined room \(idx)")
+                        log3("Replacing door destination room \(String(describing: door.destinationRoom)) with defined room \(idx)")
                         door.destinationRoom =  definedRooms[idx]!
                         
                         // TODO:Potentially, we would need to merge information form the destRoom with a defined one
@@ -179,8 +194,8 @@ public final class FindEverythingWorker: Worker {
                 
                 if room.label != definedRoom.label {
                     room.potential.remove(definedRoomIndex)
-                    print("Defined room was \(definedRoom) vs \(room.label)")
-                    print("Removed potential \(definedRoomIndex) from room \(room.label) \(room.path) because of label mismatch ")
+                    log4("Defined room was \(definedRoom) vs \(room.label)")
+                    log4("Removed potential \(definedRoomIndex) from room \(room.label) \(room.path) because of label mismatch ")
                     continue
                 }
                 
@@ -271,12 +286,45 @@ public final class FindEverythingWorker: Worker {
     private var query: [String] = []
     
     override public func generatePlans() -> [String] {
-        query = [String(doorPath(N: problem.roomsCount).dropFirst(iterations))]
-        return query
+        let query = String(doorPath(N: problem.roomsCount * iterations))
+        let sentQuery = String(query.suffix(problem.roomsCount * 18))
+        self.query = [sentQuery]
+        return [sentQuery]
     }
     
     override public func generateGuess() -> MapDescription {
-        return MapDescription(rooms: [], startingRoom: 0, connections: [])
+        let rooms = knownState.definedRooms.compactMap { $0?.index }
+        let allRooms = knownState.definedRooms.compactMap { $0}
+        
+        for room in allRooms {
+            for door in room.doors {
+                if let destinationRoom = door.destinationRoom {
+                    
+                    if door.destinationDoor == nil {
+                        /// Connect somehow door
+                        ///
+                        
+                        // Find firs door that goes back
+                        let backDoor = destinationRoom.doors.first(where: { $0.destinationRoom === room && $0.destinationDoor == nil })!
+                        
+                        door.destinationDoor = backDoor
+                        backDoor.destinationDoor = door
+                    }
+                }
+            }
+        }
+        
+        var connections: [Connection] = []
+        
+        for (roomIndex, room) in allRooms.enumerated() {
+            for (doorIndex, door) in room.doors.enumerated() {
+                let desinaroomIndex = allRooms.firstIndex(where: { $0 === door.destinationRoom })!
+                let toDoor = door.destinationDoor!.id
+                connections.connect(room: roomIndex, door: doorIndex, toRoom: desinaroomIndex, toDoor: Int(toDoor)!)
+            }
+        }
+        
+        return MapDescription(rooms: knownState.definedRooms.compactMap { $0}.map { $0.label }, startingRoom: 0, connections: connections)
     }
     
     private func createExplorationRoom(label: Int, path: [Int]) -> ExplorationRoom {
@@ -297,6 +345,7 @@ public final class FindEverythingWorker: Worker {
             print("[ProcessExplored] \(message())")
         }
     }
+    
     
     override public func processExplored(explored: ExploreResponse) {
         for (query, result) in zip(query, explored.results) {
