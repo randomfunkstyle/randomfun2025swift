@@ -49,7 +49,7 @@ final class OrchestrationLayerTests: XCTestCase {
         
         switch decision {
         case .stop(let reason):
-            XCTAssertTrue(reason.contains("Found all 3 expected rooms"))
+            XCTAssertTrue(reason.contains("Found exactly 3 expected rooms"))
         default:
             XCTFail("Should stop exploration")
         }
