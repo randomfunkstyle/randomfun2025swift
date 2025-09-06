@@ -192,23 +192,47 @@ public final class FindEverythingWorker: Worker {
                 guard let definedRoomIndex = definedRoom.index else { continue }
                 guard room.potential.contains(definedRoomIndex) else { continue }
                 
-                if room.label != definedRoom.label {
+                if isDifferen(room: room, definedRoom: definedRoom, depth: 3) {
                     room.potential.remove(definedRoomIndex)
-                    log4("Defined room was \(definedRoom) vs \(room.label)")
-                    log4("Removed potential \(definedRoomIndex) from room \(room.label) \(room.path) because of label mismatch ")
                     continue
                 }
-                
-                for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
-                    guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else { continue }
-                    guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
-                    if definedRoomDoorDestinationRoom.label != roomDoorDestinationRoom.label {
-                        room.potential.remove(definedRoomIndex)
-                        continue
-                    }
-                }
+//                if room.label != definedRoom.label {
+//                    room.potential.remove(definedRoomIndex)
+//                    log4("Defined room was \(definedRoom) vs \(room.label)")
+//                    log4("Removed potential \(definedRoomIndex) from room \(room.label) \(room.path) because of label mismatch ")
+//                    continue
+//                }
+//                
+//                for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
+//                    guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else { continue }
+//                    guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
+//                    if definedRoomDoorDestinationRoom.label != roomDoorDestinationRoom.label {
+//                        room.potential.remove(definedRoomIndex)
+//                        continue
+//                    }
+//                }
             }
         }
+        
+        
+        private func isDifferen(room: ExplorationRoom, definedRoom:ExplorationRoom, depth: Int) -> Bool {
+            guard depth > 0 else { return false }
+            guard room.label == definedRoom.label else { return true}
+            
+            for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
+                guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else { continue }
+                guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
+
+                if isDifferen(room: definedRoomDoorDestinationRoom, definedRoom: roomDoorDestinationRoom, depth: depth - 1) {
+                    return true
+                }
+            }
+            
+            
+            return false
+            
+        }
+            
         
         private func addRoom(_ room: ExplorationRoom) {
             if let _ = room.index {
