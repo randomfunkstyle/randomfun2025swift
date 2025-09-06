@@ -14,23 +14,22 @@ public struct PathResult {
 }
 
 extension GraphMatcher {
-    /// Execute exploration from a single node for multiple paths
+    /// Execute exploration from the starting node for multiple paths
+    /// This reflects the reality that we can only explore from the start in the API
     /// - Parameters:
-    ///   - node: The node to explore from
-    ///   - paths: Array of paths to explore
+    ///   - paths: Array of paths to explore from the starting node
     ///   - sourceGraph: The graph to explore
     /// - Returns: Array of PathResult for each exploration
-    public func explorePathsFromNode(node: Node, paths: [String], sourceGraph: Graph) -> [PathResult] {
+    public func exploreFromStart(paths: [String], sourceGraph: Graph) -> [PathResult] {
         var results: [PathResult] = []
+        let startNodeId = sourceGraph.startingNodeId
         
         for path in paths {
             // Use existing explorePath method to get labels
-            let labels = explorePath(sourceGraph: sourceGraph, 
-                                    path: path, 
-                                    startingNodeId: node.id)
+            let labels = explorePath(sourceGraph: sourceGraph, path: path)
             
             let result = PathResult(
-                startNodeId: node.id,
+                startNodeId: startNodeId,
                 path: path,
                 observedLabels: labels
             )
@@ -40,42 +39,27 @@ extension GraphMatcher {
         return results
     }
     
-    /// Helper method for explorePath with custom starting node
-    private func explorePath(sourceGraph: Graph, path: String, startingNodeId: Int) -> [RoomLabel] {
-        var currentNodeId = startingNodeId
-        var labels: [RoomLabel] = []
-        
-        // Add starting room label
-        if let startingNode = sourceGraph.getNode(currentNodeId) {
-            labels.append(startingNode.label ?? .A)  // Default to A if no label
+    /// Legacy method - kept for compatibility but should be phased out
+    /// In reality, we can only explore from the starting node
+    /// - Parameters:
+    ///   - node: The node to explore from (must be the starting node)
+    ///   - paths: Array of paths to explore
+    ///   - sourceGraph: The graph to explore
+    /// - Returns: Array of PathResult for each exploration
+    public func explorePathsFromNode(node: Node, paths: [String], sourceGraph: Graph) -> [PathResult] {
+        // In reality, we can only explore from the starting node
+        // This method is kept for compatibility but just delegates to exploreFromStart
+        if node.id != sourceGraph.startingNodeId {
+            // In a real scenario, we can't explore from arbitrary nodes
+            // Return empty results for non-starting nodes
+            return []
         }
         
-        // Walk through each door in the path
-        for doorChar in path {
-            guard let door = Int(String(doorChar)), door >= 0 && door < 6 else { continue }
-            
-            // Find where this door leads
-            if let currentNode = sourceGraph.getNode(currentNodeId),
-               let connection = currentNode.doors[door],
-               let (nextNodeId, _) = connection {
-                currentNodeId = nextNodeId
-                
-                // Add the label of the room we entered
-                if let nextNode = sourceGraph.getNode(nextNodeId) {
-                    labels.append(nextNode.label ?? .A)  // Default to A if no label
-                }
-            } else {
-                // If door doesn't exist or leads nowhere, stay in current room
-                if let currentNode = sourceGraph.getNode(currentNodeId) {
-                    labels.append(currentNode.label ?? .A)
-                }
-            }
-        }
-        
-        return labels
+        return exploreFromStart(paths: paths, sourceGraph: sourceGraph)
     }
     
     /// Execute multiple explorations efficiently
+    /// Note: All explorations must be from the starting node
     /// - Parameters:
     ///   - explorations: Array of tuples containing (NodeId, [paths to explore])
     ///   - sourceGraph: The graph to explore
@@ -84,10 +68,12 @@ extension GraphMatcher {
         var allResults: [PathResult] = []
         
         for (nodeId, paths) in explorations {
-            guard let node = sourceGraph.getNode(nodeId) else { continue }
-            
-            let results = explorePathsFromNode(node: node, paths: paths, sourceGraph: sourceGraph)
-            allResults.append(contentsOf: results)
+            // We can only explore from the starting node
+            if nodeId == sourceGraph.startingNodeId {
+                let results = exploreFromStart(paths: paths, sourceGraph: sourceGraph)
+                allResults.append(contentsOf: results)
+            }
+            // Ignore requests to explore from other nodes
         }
         
         return allResults

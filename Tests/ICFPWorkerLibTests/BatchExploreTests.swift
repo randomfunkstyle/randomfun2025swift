@@ -169,20 +169,26 @@ final class BatchExploreTests: XCTestCase {
         let complexGraph = matcher.buildGraphFromExploration(explorations: explorations)
         let allNodes = complexGraph.getAllNodes()
         
-        // Create batch explorations for all nodes
-        var batchExplorations: [(nodeId: Int, paths: [String])] = []
-        for node in allNodes {
-            batchExplorations.append((nodeId: node.id, paths: ["0", "1"]))
-        }
+        // In reality, we can only explore from the starting node
+        // Create batch explorations only for the starting node
+        let startNodeId = complexGraph.startingNodeId
+        let batchExplorations = [(nodeId: startNodeId, paths: ["0", "1", "5", "55"])]
         
         let results = matcher.batchExplore(explorations: batchExplorations, sourceGraph: complexGraph)
         
-        // Should have 2 results per node
-        XCTAssertEqual(results.count, allNodes.count * 2)
+        // Should have results only for starting node explorations
+        XCTAssertEqual(results.count, 4) // 4 paths from starting node
         
-        // All results should have valid start node IDs
+        // All results should be from the starting node
         for result in results {
-            XCTAssertTrue(allNodes.contains { $0.id == result.startNodeId })
+            XCTAssertEqual(result.startNodeId, startNodeId)
         }
+        
+        // Verify the paths are correct
+        let resultPaths = results.map { $0.path }
+        XCTAssertTrue(resultPaths.contains("0"))
+        XCTAssertTrue(resultPaths.contains("1"))
+        XCTAssertTrue(resultPaths.contains("5"))
+        XCTAssertTrue(resultPaths.contains("55"))
     }
 }

@@ -13,11 +13,12 @@ public struct NodeSignature {
 }
 
 extension GraphMatcher {
-    /// Compute signature for a single node based on exploring specific paths
+    /// Compute signature for a single node by tracing paths through the BUILT graph
+    /// IMPORTANT: The graph parameter should be the built/reconstructed graph, NOT the source graph
     /// - Parameters:
-    ///   - node: The node to compute signature for
-    ///   - paths: The paths to explore from this node
-    ///   - graph: The graph containing the node
+    ///   - node: The node to compute signature for (must be from the built graph)
+    ///   - paths: The paths to trace from this node
+    ///   - graph: The BUILT graph containing the node (NOT the source graph)
     /// - Returns: NodeSignature containing the path->label mappings
     public func computeNodeSignature(node: Node, paths: [String], graph: Graph) -> NodeSignature {
         var pathLabels: [String: RoomLabel] = [:]
@@ -48,7 +49,8 @@ extension GraphMatcher {
                    let (nextNodeId, _) = connection {
                     currentNodeId = nextNodeId
                 } else {
-                    // Path cannot be followed from this node
+                    // Path cannot be followed from this node in the current built graph
+                    // This is OK - it means we haven't explored this path yet
                     validPath = false
                     break
                 }
@@ -60,6 +62,8 @@ extension GraphMatcher {
                     pathLabels[path] = finalNode.label ?? .A
                 }
             }
+            // If path is invalid, we simply don't include it in the signature
+            // Incomplete signatures are fine - nodes may not have all paths explored yet
         }
         
         return NodeSignature(

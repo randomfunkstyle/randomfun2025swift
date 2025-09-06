@@ -78,17 +78,20 @@ final class ExplorePathsFromNodeTests: XCTestCase {
         let graph = Graph(startingLabel: .A)
         let nodeId = graph.addNode(label: .B)
         
-        // Try to explore from a non-existent node
+        // Try to explore from a non-existent node (not the starting node)
         let fakeNode = Node(id: 9999, label: .C)
         let paths = ["0", "1"]
         
         let results = matcher.explorePathsFromNode(node: fakeNode, paths: paths, sourceGraph: graph)
         
-        // Should still return results, but with limited exploration
-        XCTAssertEqual(results.count, 2)
-        for result in results {
-            XCTAssertEqual(result.startNodeId, 9999)
-        }
+        // In reality, we can only explore from the starting node
+        // Non-starting nodes should return empty results
+        XCTAssertEqual(results.count, 0)
+        
+        // Test that starting node works correctly
+        let startNode = graph.getNode(graph.startingNodeId)!
+        let startResults = matcher.explorePathsFromNode(node: startNode, paths: paths, sourceGraph: graph)
+        XCTAssertEqual(startResults.count, 2)
     }
     
     // Test 6: Performance - should be O(path.length)

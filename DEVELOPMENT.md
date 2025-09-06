@@ -347,6 +347,93 @@ class RoomIdentificationIntegrationTests {
 }
 ```
 
+### Phase 1-5 Integration Tests (Expanded)
+
+#### Three-Room Layout Integration (`ThreeRoomIntegrationTests.swift`)
+```swift
+class ThreeRoomIntegrationTests {
+    // Complete algorithm flow for 3-room problem
+    func testThreeRoomCompleteIdentification()
+    func testThreeRoomInitialExpansion() // Verify 6 doors explored
+    func testThreeRoomLabelAnalysis() // Verify groups: A=[6 nodes], B=[1 node]
+    func testThreeRoomSignatureComputation() // Verify duplicates detected
+    func testThreeRoomPathGeneration() // Verify strategic paths selected
+    func testThreeRoomExplorationExecution() // Verify batch exploration
+    func testThreeRoomGraphBuilding() // Verify graph structure
+    func testThreeRoomDuplicateMerging() // Verify nodes 1-5 are same as start
+    func testThreeRoomPerformance() // Should complete in <20 queries
+    func testThreeRoomMinimalExploration() // Find optimal path set
+}
+```
+
+#### Six-Room Hexagon Integration (`SixRoomIntegrationTests.swift`)
+```swift
+class SixRoomIntegrationTests {
+    // Complete algorithm flow for 6-room hexagon
+    func testSixRoomCompleteIdentification()
+    func testSixRoomInitialExpansion() // Verify 6 doors explored
+    func testSixRoomLabelAnalysis() // Verify duplicate labels detected
+    func testSixRoomDeepExploration() // Verify depth-2 paths used
+    func testSixRoomSignatureComputation() // Verify 6 unique signatures
+    func testSixRoomDuplicateResolution() // Rooms 0&4 have label 0, but different signatures
+    func testSixRoomPathOptimization() // Remove redundant paths
+    func testSixRoomGraphConstruction() // Verify hexagon structure
+    func testSixRoomPerformance() // Should complete in <50 queries
+    func testSixRoomConnectionVerification() // Verify all connections correct
+}
+```
+
+#### Algorithm Flow Integration (`AlgorithmFlowTests.swift`)
+```swift
+class AlgorithmFlowTests {
+    // Test complete flow of phases 1-5
+    func testPhase1InitialExpansion() // Graph has 6+ nodes after first expansion
+    func testPhase2LabelDistribution() // Correct grouping and prioritization
+    func testPhase3PathGeneration() // Strategic paths are selected
+    func testPhase4ExplorationExecution() // Batch exploration works
+    func testPhase5GraphBuilding() // Graph grows with each exploration
+    func testSignatureSystemFlow() // Signatures correctly identify rooms
+    func testDuplicateMergingFlow() // Nodes with identical signatures merged
+    func testIncrementalRefinement() // Each iteration improves accuracy
+    func testConvergenceDetection() // Algorithm knows when to stop
+    func testBacktrackingCapability() // Can recover from wrong assumptions
+}
+```
+
+#### Signature System Integration (`SignatureSystemIntegrationTests.swift`)
+```swift
+class SignatureSystemIntegrationTests {
+    // End-to-end signature system validation
+    func testDuplicateDetection() // Nodes with same signature identified
+    func testUniqueRoomIdentification() // Each signature = one room
+    func testPathOptimization() // Redundant paths removed
+    func testMinimalSignatures() // Smallest distinguishing set found
+    func testSignatureEvolution() // Signatures refined with more exploration
+    func testPartialSignatureMatching() // Early duplicate detection
+    func testSignatureConsistency() // Same exploration = same signature
+    func testSignatureMerging() // Combine partial signatures correctly
+    func testSignatureInvalidation() // Handle contradictory data
+    func testSignatureCompleteness() // Know when signatures are sufficient
+}
+```
+
+#### Edge Case Integration (`EdgeCaseIntegrationTests.swift`)
+```swift
+class EdgeCaseIntegrationTests {
+    // Challenging scenarios
+    func testAllSameLabel() // All rooms have label A
+    func testMaximumDuplicates() // 8 rooms, 4 labels (pigeonhole)
+    func testDeepPathsRequired() // Need depth-3 to distinguish
+    func testPartialInformation() // Incomplete exploration data
+    func testDisconnectedComponents() // Multiple isolated subgraphs
+    func testSelfLoopHeavy() // Most doors are self-loops
+    func testFullyConnected() // Every room connects to every other
+    func testAsymmetricConnections() // One-way doors only
+    func testLabelChanges() // Labels change during exploration
+    func testMaximalComplexity() // Worst-case scenario
+}
+```
+
 ## Performance Tests
 
 ### Efficiency Validation
@@ -432,20 +519,33 @@ E2E Tests (3)           ██
 
 ## Total Test Count
 
-- Path Generation: 12 tests
-- Exploration: 11 tests  
-- Graph Building: 12 tests
-- Label Analysis: 12 tests
-- Signature Computation: 12 tests
-- Signature Comparison: 12 tests
+### Unit Tests (Phases 1-5 Complete)
+- Path Generation: 12 tests ✅
+- Exploration: 11 tests ✅
+- Graph Building: 12 tests ✅
+- Label Analysis: 12 tests ✅
+- Signature Computation: 12 tests ✅
+- Signature Comparison: 12 tests ✅
+
+### Unit Tests (Phases 6-7 Pending)
 - Room Identification: 12 tests
 - Orchestration: 12 tests
 - Main Algorithm: 9 tests
-- Integration: 8 tests
+
+### Integration Tests (Expanded for Phases 1-5)
+- Three-Room Layout: 10 tests
+- Six-Room Hexagon: 10 tests
+- Algorithm Flow: 10 tests
+- Signature System: 10 tests
+- Edge Cases: 10 tests
+- Original Integration: 8 tests
+
+### Performance & Error Tests
 - Performance: 5 tests
 - Error Handling: 7 tests
 
-**Total: 124 tests**
+**Current Total: 128 tests implemented**
+**Target Total: 174 tests (with expanded integration)**
 
 ## Implementation Order
 
