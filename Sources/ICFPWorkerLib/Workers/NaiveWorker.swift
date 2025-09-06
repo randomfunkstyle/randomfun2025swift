@@ -2,17 +2,16 @@ class State {
     let matrix: [[Bool]]
     let currentRoom: Int
     let steps: [Int]
-    var entropy: Int
-    var outcomes: [Int: [State]] = [:]
+    let entropy: Int
 
-    init(matrix: [[Bool]], currentRoom: Int, steps: [Int], entropy: Int) {
+    init(matrix: [[Bool]], currentRoom: Int, steps: [Int]) {
         self.matrix = matrix
         self.currentRoom = currentRoom
         self.steps = steps
-        self.entropy = entropy
+        self.entropy = Self.calcEntropy(matrix: matrix)
     }
 
-    func calcEntropy(matrix: [[Bool]]) -> Int {
+    private static func calcEntropy(matrix: [[Bool]]) -> Int {
         return matrix.flatMap { $0 }.filter { $0 }.count
     }
 
@@ -38,8 +37,8 @@ class State {
         return newMatrix
     }
 
-    func expand(roomCount: Int, doorCount: Int) {
-        outcomes = [:]
+    func expand(roomCount: Int, doorCount: Int) -> [Int: [State]] {
+        var outcomes: [Int: [State]] = [:]
         for door in 0..<doorCount {
             var possibleOutcomes: [State] = []
 
@@ -64,35 +63,33 @@ class State {
                 let newState = State(
                     matrix: newMatrix,
                     currentRoom: possibleResult,
-                    steps: newSteps,
-                    entropy: calcEntropy(matrix: newMatrix)
+                    steps: newSteps
                 )
                 possibleOutcomes.append(newState)
             }
             outcomes[door] = possibleOutcomes
         }
+        return outcomes
     }
 
-    func getDecisionEntropy(door: Int) -> Int {
+    func getDecisionEntropy(door: Int, outcomes: [Int: [State]]) -> Int {
         let outcomeStates = outcomes[door]
         return outcomeStates?.map { $0.entropy }.max() ?? entropy
     }
 }
 
 public final class NaiveWorker: Worker {
-    var matrix: [[Bool]]
-    let roomCount: Int
-    let doorCount = 6
-    var plan: [Int]
-    var currentState: State
-    var mapDescription: MapDescription? = nil
+    private let roomCount: Int
+    private let doorCount = 6
+    private var currentState: State
+    private var mapDescription: MapDescription? = nil
+    private var plan: [Int] = []
 
     public override init(problem: Problem, client: ExplorationClient) {
         self.roomCount = problem.roomsCount
         let size = problem.roomsCount * doorCount
-        self.matrix = Array(repeating: Array(repeating: true, count: size), count: size)
-        self.plan = []
-        self.currentState = State(matrix: matrix, currentRoom: 0, steps: [], entropy: size * size)
+        let initialMatrix = Array(repeating: Array(repeating: true, count: size), count: size)
+        self.currentState = State(matrix: initialMatrix, currentRoom: 0, steps: [])
         super.init(problem: problem, client: client)
     }
 
@@ -100,15 +97,17 @@ public final class NaiveWorker: Worker {
         var states: [State] = [currentState]
 
         for step in 0..<(roomCount * doorCount * 3) {
-            for state in states {
-                state.expand(roomCount: roomCount, doorCount: doorCount)
+            let stateOutcomes = states.map { state in
+                (state, state.expand(roomCount: roomCount, doorCount: doorCount))
             }
 
             var bestDoor = -1
             var bestEntropy = Int.max
 
             for door in 0..<doorCount {
-                let doorEntropy = states.map { $0.getDecisionEntropy(door: door) }.max()!
+                let doorEntropy = stateOutcomes.map { (state, outcomes) in
+                    state.getDecisionEntropy(door: door, outcomes: outcomes)
+                }.max()!
 
                 if doorEntropy < bestEntropy {
                     bestEntropy = doorEntropy
@@ -121,7 +120,7 @@ public final class NaiveWorker: Worker {
                 return anyState.steps + [bestDoor]
             }
 
-            states = states.flatMap { $0.outcomes[bestDoor]! }
+            states = stateOutcomes.flatMap { (_, outcomes) in outcomes[bestDoor]! }
             printMatrix(matrix: states[0].matrix)
             print(
                 "Step \(step), states: \(states.count), entropy: \(bestEntropy), door: \(bestDoor)")
@@ -145,7 +144,15 @@ public final class NaiveWorker: Worker {
 
     public override func processExplored(explored: ExploreResponse) {
         let results = explored.results[0]
-        var currentRoom = 0
+        let newState = updateStateWithResults(
+            currentState: currentState, plan: plan, results: results)
+        self.currentState = newState
+        self.mapDescription = generateMapDescription()
+    }
+
+    private func updateStateWithResults(currentState: State, plan: [Int], results: [Int]) -> State {
+        var matrix = currentState.matrix
+        var currentRoom = currentState.currentRoom
 
         for door in plan {
             let nextRoom = results[door]
@@ -167,10 +174,8 @@ public final class NaiveWorker: Worker {
             }
             currentRoom = nextRoom
         }
-        self.currentState = State(
-            matrix: matrix, currentRoom: currentRoom, steps: [],
-            entropy: matrix.flatMap { $0 }.filter { $0 }.count)
-        self.mapDescription = generateMapDescription()
+
+        return State(matrix: matrix, currentRoom: currentRoom, steps: [])
     }
 
     private func generateMapDescription() -> MapDescription? {
@@ -186,7 +191,7 @@ public final class NaiveWorker: Worker {
                         let fromIndex = fromRoom * self.doorCount + fromDoor
                         let toIndex = toRoom * self.doorCount + toDoor
 
-                        if self.matrix[fromIndex][toIndex] {
+                        if self.currentState.matrix[fromIndex][toIndex] {
                             let connection = Connection(
                                 from: RoomDoor(room: fromRoom, door: fromDoor),
                                 to: RoomDoor(room: toRoom, door: toDoor)
