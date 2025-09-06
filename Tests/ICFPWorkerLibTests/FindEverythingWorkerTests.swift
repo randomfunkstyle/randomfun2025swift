@@ -234,7 +234,27 @@ final class FindEverythingWorkerTests: XCTestCase {
         XCTAssertEqual(knownState.foundUniqueRooms, 2)
         XCTAssertEqual(knownState.unboundedRooms.count, 0)
         XCTAssertTrue(knownState.definedRooms[0]?.doors[5].destinationRoom === one)
+    }
+    
+    
+    func testSelfRefece() {
+        roomsCount = 1
+        let knownState = FindEverythingWorker.KnownState(totalRoomsCount: roomsCount)
+
+        let room0 = createRoom(label: 0)
+        let room1 = createRoom(label: 0)
+        room0.connect(0, room1)
         
+        // (0:)0 -0> (1:)0   <-- unique 1  [0]
+        
+        knownState.addRoomAndCompactRooms(room0)
+        knownState.addRoomAndCompactRooms(room1)
+
+        XCTAssertEqual(knownState.foundUniqueRooms, 1)
+        XCTAssertEqual(knownState.unboundedRooms.count, 0)
+        
+        let zero = knownState.definedRooms[0]!
+        XCTAssertTrue(zero.doors[0].destinationRoom === zero)        
     }
     
     var roomsCount = 3
