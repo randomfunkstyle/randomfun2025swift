@@ -414,7 +414,7 @@ class KnownState {
             let graphNode = roomToGraphNode[room.serializationId]!
             for (doorIndex, door) in room.doors.enumerated() {
                 if let destRoom = door.destinationRoom {
-                    graphNode.doors[doorIndex] = roomToGraphNode[destRoom.serializationId]
+                    graphNode.doors[doorIndex] = destRoom.serializationId
                 }
             }
         }

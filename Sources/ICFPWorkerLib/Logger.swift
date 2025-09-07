@@ -4,9 +4,9 @@ public class GraphNode: Codable {
     let nodeId: Int
     let roomLabel: Int
     let roomIndex: Int?
-    var doors: [GraphNode?]
+    var doors: [Int?]
 
-    init(nodeId: Int, roomLabel: Int, roomIndex: Int?, doors: [GraphNode?]) {
+    init(nodeId: Int, roomLabel: Int, roomIndex: Int?, doors: [Int?]) {
         self.nodeId = nodeId
         self.roomLabel = roomLabel
         self.roomIndex = roomIndex
@@ -52,8 +52,12 @@ public class Logger {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
 
-        guard let data = try? encoder.encode(logState) else {
-            print("❌ Failed to encode log state to JSON")
+        let data: Data
+
+        do {
+            data = try encoder.encode(logState)
+        } catch {
+            print("❌ Failed to encode log state to JSON: \(error.localizedDescription)")
             return
         }
 
