@@ -565,7 +565,7 @@ public final class PingWorker: Worker {
                     )
 
                     // MAG : <--
-                    knownState.addRoomAndCompactRooms(pointer.room)
+                    knownState.addRoom(pointer.room)
 
                     //     0    5     0
                     //  0 -0> 1 -5> [*0 -0> 1] ->  unbounded([*])
@@ -586,6 +586,8 @@ public final class PingWorker: Worker {
                     log2("[3]Current room changed to \(pointer.room)")
                 }
             }
+            
+            knownState.compactRooms()
         }
 
         log(

@@ -346,7 +346,7 @@ class KnownState {
             dfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth)
     }
 
-    private func addRoom(_ room: ExplorationRoom) {
+     func addRoom(_ room: ExplorationRoom) {
         if room.index != nil {
             // Room kind'a bounded, but check if there's defined room with the same index
             guard definedRooms[room.index!] == nil else { return }
