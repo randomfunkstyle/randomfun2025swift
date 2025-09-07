@@ -1,7 +1,6 @@
 // Graph Visualization with D3.js
 let currentStateIndex = 0;
 let states = [];
-let simulation = null;
 let svg = null;
 let g = null;
 let isPlaying = false;
@@ -137,18 +136,47 @@ function initializeVisualization() {
     // Create main group for transformation
     g = svg.append('g');
     
-    // Add arrow marker for directed edges
-    svg.append('defs').append('marker')
+    // Add arrow markers for directed edges (larger size)
+    const defs = svg.append('defs');
+    
+    // Default arrow
+    defs.append('marker')
         .attr('id', 'arrowhead')
         .attr('viewBox', '-0 -5 10 10')
-        .attr('refX', 30)
+        .attr('refX', 35)
         .attr('refY', 0)
         .attr('orient', 'auto')
-        .attr('markerWidth', 10)
-        .attr('markerHeight', 10)
+        .attr('markerWidth', 15)
+        .attr('markerHeight', 15)
         .append('path')
         .attr('d', 'M 0,-5 L 10,0 L 0,5')
         .attr('fill', '#666');
+    
+    // Red arrow for search paths
+    defs.append('marker')
+        .attr('id', 'arrowhead-search')
+        .attr('viewBox', '-0 -5 10 10')
+        .attr('refX', 35)
+        .attr('refY', 0)
+        .attr('orient', 'auto')
+        .attr('markerWidth', 15)
+        .attr('markerHeight', 15)
+        .append('path')
+        .attr('d', 'M 0,-5 L 10,0 L 0,5')
+        .attr('fill', '#ff4444');
+    
+    // Green arrow for ping paths
+    defs.append('marker')
+        .attr('id', 'arrowhead-ping')
+        .attr('viewBox', '-0 -5 10 10')
+        .attr('refX', 35)
+        .attr('refY', 0)
+        .attr('orient', 'auto')
+        .attr('markerWidth', 15)
+        .attr('markerHeight', 15)
+        .append('path')
+        .attr('d', 'M 0,-5 L 10,0 L 0,5')
+        .attr('fill', '#00ff00');
 }
 
 async function loadStates() {
@@ -246,11 +274,8 @@ function handleResize() {
         hiddenCanvas.height = height;
     }
     
-    // Update force center
-    if (simulation) {
-        simulation.force('center', d3.forceCenter(width / 2, height / 2));
-        simulation.alpha(0.3).restart();
-    }
+    // Update center for layout
+    // Nodes will be re-centered on next draw if needed
 }
 
 function renderCanvas() {
@@ -513,60 +538,27 @@ function drawGraph(graphData) {
         return;
     }
     
-    const newNodes = graphData.nodes || [];
-    const newEdges = graphData.edges || [];
+    // Clear everything and redraw from scratch
+    g.selectAll('*').remove();
+    linkGroup = g.append('g').attr('class', 'links');
+    nodeGroup = g.append('g').attr('class', 'nodes');
     
-    // Check if this is the first draw or a complete reset
-    const isInitialDraw = !linkGroup || !nodeGroup;
+    // Get nodes and edges from current state
+    currentNodes = (graphData.nodes || []).map(node => ({...node}));
+    currentEdges = (graphData.edges || []).map(edge => ({...edge}));
     
-    if (isInitialDraw) {
-        // Clear and create groups for the first time
-        g.selectAll('*').remove();
-        linkGroup = g.append('g').attr('class', 'links');
-        nodeGroup = g.append('g').attr('class', 'nodes');
-        currentNodes = [];
-        currentEdges = [];
-        nodeById.clear();
-    }
-    
-    // Find truly new nodes and edges
-    const existingNodeIds = new Set(currentNodes.map(n => n.id));
-    const nodesToAdd = newNodes.filter(n => !existingNodeIds.has(n.id));
-    
-    const existingEdgeKeys = new Set(currentEdges.map(e => 
-        `${e.source.id || e.source}-${e.target.id || e.target}-${e.door}`
-    ));
-    const edgesToAdd = newEdges.filter(e => {
-        const key = `${e.source}-${e.target}-${e.door}`;
-        return !existingEdgeKeys.has(key);
+    // Rebuild nodeById map
+    nodeById.clear();
+    currentNodes.forEach(node => {
+        nodeById.set(node.id, node);
     });
     
-    // Update counts
-    document.getElementById('nodecount').textContent = newNodes.length;
-    document.getElementById('edgecount').textContent = newEdges.length;
-    
-    // If nothing new, just update highlighting
-    if (nodesToAdd.length === 0 && edgesToAdd.length === 0 && !isInitialDraw) {
-        updateHighlighting();
-        return;
-    }
-    
-    // Add new nodes to current data
-    nodesToAdd.forEach(node => {
-        const nodeCopy = {...node};
-        currentNodes.push(nodeCopy);
-        nodeById.set(node.id, nodeCopy);
-    });
-    
-    // Add new edges to current data (with node references)
-    edgesToAdd.forEach(edge => {
-        const edgeCopy = {
-            ...edge,
-            source: nodeById.get(edge.source) || edge.source,
-            target: nodeById.get(edge.target) || edge.target
-        };
-        currentEdges.push(edgeCopy);
-    });
+    // Build edges with node references
+    currentEdges = currentEdges.map(edge => ({
+        ...edge,
+        source: nodeById.get(edge.source) || edge.source,
+        target: nodeById.get(edge.target) || edge.target
+    }));
     
     const nodes = currentNodes;
     const edges = currentEdges;
@@ -596,37 +588,37 @@ function drawGraph(graphData) {
     pingPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'ping'));
     pingPathData.pathNodes.forEach(node => pathNodes.set(node, 'ping'));
     
-    // Create or update force simulation
-    if (!simulation || isInitialDraw) {
-        simulation = d3.forceSimulation(nodes)
-            .force('link', d3.forceLink(edges)
-                .id(d => d.id)
-                .distance(100))
-            .force('charge', d3.forceManyBody().strength(-500))
-            .force('center', d3.forceCenter(
-                window.innerWidth / 2,
-                window.innerHeight / 2))
-            .force('collision', d3.forceCollide().radius(40));
-    } else {
-        // Update existing simulation with new nodes/edges
-        simulation.nodes(nodes);
-        simulation.force('link').links(edges);
-        simulation.alpha(0.3).restart();
-    }
+    // Layout nodes without force simulation
+    // Use a simple radial or grid layout
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
     
-    // Update edges - bind to current data
-    const link = linkGroup.selectAll('g.link-group')
-        .data(edges, d => `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`);
+    // Position nodes in a hexagonal pattern if they don't have positions
+    nodes.forEach((node, i) => {
+        if (node.x === undefined || node.y === undefined) {
+            if (node.id === 'START' || node.nodeId === '0') {
+                // Start node at center
+                node.x = centerX;
+                node.y = centerY;
+            } else {
+                // Arrange other nodes in concentric hexagons
+                const angle = (i / nodes.length) * 2 * Math.PI;
+                const radius = 150 + Math.floor(i / 6) * 100;
+                node.x = centerX + radius * Math.cos(angle);
+                node.y = centerY + radius * Math.sin(angle);
+            }
+        }
+    });
     
-    // Remove old edges
-    link.exit().remove();
-    
-    // Add new edges
-    const linkEnter = link.enter().append('g')
+    // Draw all edges
+    const linkGroups = linkGroup.selectAll('g.link-group')
+        .data(edges)
+        .enter()
+        .append('g')
         .attr('class', 'link-group');
     
     // Edge lines
-    const linkLine = linkEnter.append('line')
+    linkGroups.append('line')
         .attr('class', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
             return pathEdges.get(edgeKey) ? 'link highlighted-edge' : 'link';
@@ -642,10 +634,16 @@ function drawGraph(graphData) {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
             return pathEdges.get(edgeKey) ? 4 : 2;
         })
-        .attr('marker-end', 'url(#arrowhead)');
+        .attr('marker-end', d => {
+            const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
+            const pathType = pathEdges.get(edgeKey);
+            if (pathType === 'ping') return 'url(#arrowhead-ping)';
+            if (pathType === 'search') return 'url(#arrowhead-search)';
+            return 'url(#arrowhead)';
+        });
     
     // Edge labels (door numbers)
-    const linkLabel = linkEnter.append('text')
+    linkGroups.append('text')
         .attr('class', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
             return pathEdges.get(edgeKey) ? 'link-label highlighted-label' : 'link-label';
@@ -665,23 +663,20 @@ function drawGraph(graphData) {
         })
         .attr('text-anchor', 'middle');
     
-    // Update nodes - bind to current data
-    const node = nodeGroup.selectAll('g.node-group')
-        .data(nodes, d => d.id);
-    
-    // Remove old nodes
-    node.exit().remove();
-    
-    // Add new nodes
-    const nodeEnter = node.enter().append('g')
+    // Draw all nodes
+    const nodeGroups = nodeGroup.selectAll('g.node-group')
+        .data(nodes)
+        .enter()
+        .append('g')
         .attr('class', 'node-group')
+        .attr('transform', d => `translate(${d.x},${d.y})`)
         .call(d3.drag()
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended));
     
-    // Draw hexagons for new nodes
-    nodeEnter.append('path')
+    // Draw hexagons for nodes
+    nodeGroups.append('path')
         .attr('d', hexagonPath(30))
         .attr('fill', d => labelColors[d.label] || '#ccc')
         .attr('stroke', d => {
@@ -707,7 +702,7 @@ function drawGraph(graphData) {
         });
     
     // Node labels (show nodeId if available, otherwise ID)
-    nodeEnter.append('text')
+    nodeGroups.append('text')
         .attr('class', 'node-id')
         .text(d => d.nodeId || d.id)
         .attr('text-anchor', 'middle')
@@ -716,7 +711,7 @@ function drawGraph(graphData) {
         .attr('font-weight', 'bold');
     
     // Node labels (room label)
-    nodeEnter.append('text')
+    nodeGroups.append('text')
         .attr('class', 'node-label')
         .text(d => d.label)
         .attr('text-anchor', 'middle')
@@ -725,7 +720,7 @@ function drawGraph(graphData) {
         .attr('fill', '#333');
     
     // Room index indicator for special nodes
-    nodeEnter.append('text')
+    nodeGroups.append('text')
         .attr('class', 'node-room-index')
         .attr('text-anchor', 'middle')
         .attr('dy', '30')
@@ -734,35 +729,24 @@ function drawGraph(graphData) {
         .attr('fill', '#9f7aea')
         .text(d => d.roomIndex !== undefined && d.roomIndex !== null ? `[${d.roomIndex}]` : '');
     
-    // Merge enter and update selections
-    const allLinks = linkGroup.selectAll('g.link-group');
-    const allNodes = nodeGroup.selectAll('g.node-group');
+    // Update link positions
+    linkGroup.selectAll('line')
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x)
+        .attr('y2', d => d.target.y);
     
-    // Update highlighting for all elements
-    updateHighlighting();
+    linkGroup.selectAll('text')
+        .attr('x', d => (d.source.x + d.target.x) / 2)
+        .attr('y', d => (d.source.y + d.target.y) / 2);
     
     // Check if we should switch rendering modes
     updateRenderingMode();
     
-    // Update positions on simulation tick
-    simulation.on('tick', () => {
-        if (useCanvas) {
-            renderCanvas();
-        } else {
-        linkGroup.selectAll('line')
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
-        
-        linkGroup.selectAll('text')
-            .attr('x', d => (d.source.x + d.target.x) / 2)
-            .attr('y', d => (d.source.y + d.target.y) / 2);
-        
-            nodeGroup.selectAll('g.node-group')
-                .attr('transform', d => `translate(${d.x},${d.y})`);
-        }
-    });
+    // Render canvas if needed
+    if (useCanvas) {
+        renderCanvas();
+    }
 }
 
 function updateHighlighting() {
@@ -856,22 +840,35 @@ function hexagonPath(radius) {
     return 'M' + hexagon.join('L') + 'Z';
 }
 
-// Drag functions
+// Drag functions (without simulation)
 function dragstarted(event, d) {
-    if (!event.active) simulation.alphaTarget(0.3).restart();
-    d.fx = d.x;
-    d.fy = d.y;
+    d3.select(this).raise();
 }
 
 function dragged(event, d) {
-    d.fx = event.x;
-    d.fy = event.y;
+    d.x = event.x;
+    d.y = event.y;
+    
+    // Update node position
+    d3.select(this)
+        .attr('transform', `translate(${d.x},${d.y})`);
+    
+    // Update connected edges
+    linkGroup.selectAll('line')
+        .filter(edge => edge.source.id === d.id || edge.target.id === d.id)
+        .attr('x1', edge => edge.source.x)
+        .attr('y1', edge => edge.source.y)
+        .attr('x2', edge => edge.target.x)
+        .attr('y2', edge => edge.target.y);
+    
+    linkGroup.selectAll('text')
+        .filter(edge => edge.source.id === d.id || edge.target.id === d.id)
+        .attr('x', edge => (edge.source.x + edge.target.x) / 2)
+        .attr('y', edge => (edge.source.y + edge.target.y) / 2);
 }
 
 function dragended(event, d) {
-    if (!event.active) simulation.alphaTarget(0);
-    d.fx = null;
-    d.fy = null;
+    // Nothing needed here without simulation
 }
 
 // Navigation functions
@@ -946,9 +943,24 @@ function resetView() {
     updateRenderingMode();
     updateLevelOfDetail();
     
-    // Restart simulation
-    if (simulation) {
-        simulation.alpha(1).restart();
+    // Re-center nodes
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    currentNodes.forEach((node, i) => {
+        if (node.id === 'START' || node.nodeId === '0') {
+            node.x = centerX;
+            node.y = centerY;
+        } else {
+            const angle = (i / currentNodes.length) * 2 * Math.PI;
+            const radius = 150 + Math.floor(i / 6) * 100;
+            node.x = centerX + radius * Math.cos(angle);
+            node.y = centerY + radius * Math.sin(angle);
+        }
+    });
+    
+    // Redraw with new positions
+    if (states[currentStateIndex]) {
+        drawGraph(states[currentStateIndex].current_graph);
     }
 }
 

@@ -66,3 +66,5 @@ fastlane/test_output
 .swiftpm/xcode/package.xcworkspace/
 .env
 *.xcscheme
+visualization/__pycache__/app.cpython-313.pyc
+.gitignore

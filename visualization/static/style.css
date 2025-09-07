@@ -254,25 +254,12 @@ canvas {
     filter: brightness(1.1);
 }
 
-.node-hexagon.path-node {
-    animation: nodePulse 1.5s infinite;
-}
-
 .node-hexagon.search-path {
     filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.6));
 }
 
 .node-hexagon.ping-path {
     filter: drop-shadow(0 0 10px rgba(0, 255, 0, 0.6));
-}
-
-@keyframes nodePulse {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.05);
-    }
 }
 
 .link {
@@ -282,7 +269,6 @@ canvas {
 
 .link.highlighted-edge {
     opacity: 1;
-    animation: pulse 1.5s infinite;
 }
 
 .link.search-edge {
@@ -291,17 +277,6 @@ canvas {
 
 .link.ping-edge {
     filter: drop-shadow(0 0 8px rgba(0, 255, 0, 0.8));
-}
-
-@keyframes pulse {
-    0%, 100% {
-        stroke-width: 4;
-        opacity: 1;
-    }
-    50% {
-        stroke-width: 6;
-        opacity: 0.8;
-    }
 }
 
 .link-label {
