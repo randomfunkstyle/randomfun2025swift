@@ -64,8 +64,8 @@ struct CountLines: AsyncParsableCommand {
             case "Grid":
                 let problems: [Problem] = Problem.gridProblems()
 
-                for depth in 1...2 {
-                    for take in 5...6 {
+                for depth in (3...5).reversed() {
+                    for take in (5...10).reversed() {
                          for p in problems {
                             print("Running problem \(p.name) with depth \(depth) and take \(take)")
                             if #available(macOS 13.0, *) {
