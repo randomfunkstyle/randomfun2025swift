@@ -272,6 +272,12 @@ class KnownState {
     func isDifferent(room: ExplorationRoom, definedRoom: ExplorationRoom, depth: Int) -> Bool {
         guard depth > 0 else { return false }
         guard room.label == definedRoom.label else { return true }
+        
+        if let roomIndex = room.index, let definedRoomIndex = definedRoom.index {
+            if roomIndex == definedRoomIndex {
+                return false
+            }
+        }
 
         for (roomDoor, definedRoomDoor) in zip(room.doors, definedRoom.doors) {
             guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else {

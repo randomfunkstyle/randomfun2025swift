@@ -40,6 +40,15 @@ struct CountLines: AsyncParsableCommand {
                         problem: .secundus, client: HTTPExplorationClient(), depth: 5, take: 10
                     ).run()
                 }
+                
+            case "Ping":
+                if #available(macOS 13.0, *) {
+                    //                    try await  PingWorker(problem: .primus, client: MockExplorationClient(layout: .hexagon), debug: true).run()
+                    try await PingWorker(
+                        problem: .aleph, client: HTTPExplorationClient(), depth: 5, take: 5
+                    ).run()
+                }
+
             case "Grid":
                 for depth in 1...5 {
                     for take in 5...15 {

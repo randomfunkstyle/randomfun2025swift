@@ -36,7 +36,6 @@ final class ExplorationRoom: CustomStringConvertible {
                 return "\(door.id)->nil"
             }
         }.joined(separator: ", ")
-        return
-            "Room(label: \(label), path: \(path), index: \(String(describing: index)), potential: \(potential), doors: [\(doorsDesc)])"
+        return "Room(label: \(label), path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
     }
 }
