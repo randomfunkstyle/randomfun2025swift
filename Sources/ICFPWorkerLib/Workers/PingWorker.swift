@@ -182,9 +182,9 @@ public final class PingWorker: Worker {
                 
                 if charcoaled[currentRoomRandom!.label] == nil {
                     if Int.random(in: 0 ..< 100) < 10 || (currentRoomRandom!.index != nil && Int.random(in: 0 ..< 100) < 66) {
-                        if currentRoomRandom!.index != nil {
-                            print("🚁 Charcoaling already bounded room \(currentRoomRandom!)")
-                        }
+//                        if currentRoomRandom!.index != nil {
+//                            print("🚁 Charcoaling already bounded room \(currentRoomRandom!)")
+//                        }
                         let nextLabel = (currentRoomRandom!.label + 1) % 4
                         charcoaled[currentRoomRandom!.label] = .init(room: currentRoomRandom!, prevLabel: currentRoomRandom!.label, nextLabel: nextLabel)
                         nextQuery.append(.charcoaled(nextLabel))
@@ -195,7 +195,7 @@ public final class PingWorker: Worker {
                 itemsAdded += 1
             }
             
-            print("🔥 Added \(itemsAdded) random items to the query")
+//            print("🔥 Added \(itemsAdded) random items to the query")
             
             let pingQuery = PingQuery(
                 charcoaled: charcoaled,
@@ -207,8 +207,8 @@ public final class PingWorker: Worker {
             // [.move(1)]
             // 0,1
             
-            print("🔥 Ping query: \(pingQuery.query)")
-            print("🔥 Checking behaviour of potential \(potential.room) by \(bound) and chalkoaling \(charcoaled.keys.sorted())")
+//            print("🔥 Ping query: \(pingQuery.query)")
+//            print("🔥 Checking behaviour of potential \(potential.room) by \(bound) and chalkoaling \(charcoaled.keys.sorted())")
             
             // This is the mighty query 💪  PingQuery.query
             pingQueries.append(pingQuery)
@@ -274,9 +274,9 @@ public final class PingWorker: Worker {
                     }
                     destinationRoom.potential.removeAll(where: { $0 == charcoaledRoomIndex })
                     
-                    print(
-                        "🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at laest we removed one potential \(charcoaledRoomIndex)"
-                    )
+//                    print(
+//                        "🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at laest we removed one potential \(charcoaledRoomIndex)"
+//                    )
                 }
                 
                 pointer.room = destinationRoom
@@ -316,7 +316,7 @@ public final class PingWorker: Worker {
         
         for room in roomsWeInterstedIn {
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
-                print("🌺 explore door \(door.id) in room \(room)")
+//                print("🌺 explore door \(door.id) in room \(room)")
                 
                 for i in 0 ..< 1 {
                     if let path = knownState.path(to: room) {
@@ -332,7 +332,7 @@ public final class PingWorker: Worker {
         }
         
         if !plans.isEmpty {
-            print("🎃 Using ping priority plans")
+//            print("🎃 Using ping priority plans")
         }
         return plans
     }
@@ -347,7 +347,7 @@ public final class PingWorker: Worker {
         }).shuffled().prefix(take) {
             //            print("🍈 Found oor \(room) with unknown doors")
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
-                print("🍈 Will explore door \(door.id) in room \(room)")
+//                print("🍈 Will explore door \(door.id) in room \(room)")
                 
                 for i in 0 ..< 1 {
                     if let path = knownState.path(to: room) {
@@ -370,7 +370,7 @@ public final class PingWorker: Worker {
         
         for room in allInterestingRooms {
             if let door = room.doors.filter({ $0.destinationRoom == nil }).randomElement() {
-                print("🍈 Will explore door \(door.id) in room \(room)")
+//                print("🍈 Will explore door \(door.id) in room \(room)")
                 
                 if let path = knownState.path(to: room) {
                     let additionalQuer = path + [Int(door.id)!]
