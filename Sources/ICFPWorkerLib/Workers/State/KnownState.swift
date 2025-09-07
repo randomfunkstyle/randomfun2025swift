@@ -190,8 +190,7 @@ class KnownState {
             guard unboundRoom !== boundRoom else { return }
             guard !processedRooms.contains(where: { $0 === unboundRoom }) else { return }
             processedRooms.append(unboundRoom)
-            
-            
+
             for (unboundRoomDoor, boundRoomDoor) in zip(unboundRoom.doors, boundRoom.doors) {
                 // Simplest case, we don't have info about door but roomDoor has it
                 if boundRoomDoor.destinationRoom == nil,
@@ -256,17 +255,18 @@ class KnownState {
                     log3(
                         "Replacing door destination room \(String(describing: door.destinationRoom)) with defined room \(idx)"
                     )
-                    
+
                     if definedRooms[idx] == nil {
                         // This is a new unique room found
-                        logKnownState("[4]Found new unique room: \(destRoom.label) \(destRoom.path)")
+                        logKnownState(
+                            "[4]Found new unique room: \(destRoom.label) \(destRoom.path)")
                         destRoom.potential = [foundUniqueRooms]  // 0
                         foundUniqueRooms += 1
                         definedRooms[destRoom.index!] = destRoom
                         logKnownState("Added unique room: with \(destRoom.index!)")
-//                        unboundedRooms.removeAll(where: { $0 === destRoom })
+                        //                        unboundedRooms.removeAll(where: { $0 === destRoom })
                     }
-                    
+
                     // This can be new room
 
                     let definedRoom = definedRooms[idx]!
@@ -343,10 +343,10 @@ class KnownState {
     func isDifferent(room: ExplorationRoom, definedRoom: ExplorationRoom, depth: Int)
         -> Bool
     {
-            dfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth)
+        dfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth)
     }
 
-     func addRoom(_ room: ExplorationRoom) {
+    func addRoom(_ room: ExplorationRoom) {
         if room.index != nil {
             // Room kind'a bounded, but check if there's defined room with the same index
             guard definedRooms[room.index!] == nil else { return }
@@ -379,6 +379,47 @@ class KnownState {
             logKnownState("Added unique room: with \(room.index!)")
             unboundedRooms.removeAll(where: { $0 === room })
         }
+    }
+
+    public func constructGraph() -> GraphNode? {
+        guard let startingPoint = rootRoom else {
+            return nil
+        }
+
+        var roomToGraphNode: [Int: GraphNode] = [:]
+        var rooms: [ExplorationRoom] = []
+
+        var queue = [startingPoint]
+        while !queue.isEmpty {
+            let current = queue.removeFirst()
+            roomToGraphNode[current.serializationId] = GraphNode(
+                nodeId: current.serializationId,
+                roomLabel: current.label,
+                roomIndex: current.index,
+                doors: Array.init(repeating: nil, count: current.doors.count)
+            )
+            rooms.append(current)
+
+            for door in current.doors {
+                if let nextRoom = door.destinationRoom {
+                    if roomToGraphNode.keys.contains(nextRoom.serializationId) {
+                        continue
+                    }
+                    queue.append(nextRoom)
+                }
+            }
+        }
+
+        for room in rooms {
+            let graphNode = roomToGraphNode[room.serializationId]!
+            for (doorIndex, door) in room.doors.enumerated() {
+                if let destRoom = door.destinationRoom {
+                    graphNode.doors[doorIndex] = roomToGraphNode[destRoom.serializationId]
+                }
+            }
+        }
+
+        return roomToGraphNode[startingPoint.serializationId]
     }
 }
 

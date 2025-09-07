@@ -1,4 +1,3 @@
-
 @available(macOS 13.0, *)
 public final class FindEverythingWorker: Worker {
     let depth: Int
@@ -43,8 +42,8 @@ public final class FindEverythingWorker: Worker {
     /// Generate random query of maxQuerySize length
     private func generateRandomQuery() -> String {
         var randomQuery = ""
-        for _ in 0 ..< maxQuerySize {
-            randomQuery += String(Int.random(in: 0 ..< 6))
+        for _ in 0..<maxQuerySize {
+            randomQuery += String(Int.random(in: 0..<6))
         }
         return randomQuery
     }
@@ -61,12 +60,12 @@ public final class FindEverythingWorker: Worker {
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
                 print("🍈 Will explore door \(door.id) in room \(room)")
 
-                for i in 0 ..< 1 {
+                for i in 0..<1 {
                     if let path = knownState.path(to: room) {
                         let additionalQuer = path + [Int(door.id)!, i]
                         let additionalQueryString =
                             additionalQuer.map { String($0) }.joined()
-                                + generateRandomQuery()
+                            + generateRandomQuery()
                         let final = String(additionalQueryString.prefix(maxQuerySize))
                         plans.append(final)
                     }
@@ -88,7 +87,7 @@ public final class FindEverythingWorker: Worker {
                     let additionalQuer = path + [Int(door.id)!]
                     let additionalQueryString =
                         additionalQuer.map { String($0) }.joined()
-                            + generateRandomQuery()
+                        + generateRandomQuery()
                     let final = String(additionalQueryString.prefix(maxQuerySize))
                     plans.append(final)
                 }
@@ -229,6 +228,7 @@ public final class FindEverythingWorker: Worker {
 
     override public func processExplored(explored: ExploreResponse) {
         for (query, result) in zip(submittedQueries, explored.results) {
+            let stateBefore = knownState.foundUniqueRooms
             let querySteps = parseQuery(query)
 
             var currentPath: [Int] = []
@@ -244,7 +244,7 @@ public final class FindEverythingWorker: Worker {
 
             let pointer = RoomState(room: currentRoom)
 
-            for i in 0 ..< querySteps.count {
+            for i in 0..<querySteps.count {
                 let (fromDoor, label) = querySteps[i]
                 let fromRoom = result[i]
                 let toRoom = result[i + 1]
@@ -260,7 +260,7 @@ public final class FindEverythingWorker: Worker {
                 let door = pointer.room.doors[fromDoor]
                 if let destinationRoom = door.destinationRoom {
                     if let idx = destinationRoom.index,
-                       knownState.definedRooms[idx] !== destinationRoom
+                        knownState.definedRooms[idx] !== destinationRoom
                     {
                         door.destinationRoom = knownState.definedRooms[idx]
                         pointer.room = knownState.definedRooms[idx]!
@@ -328,7 +328,6 @@ private func log2(_ message: @autoclosure () -> String) {
         print("[ProcessExplored] \(message())")
     }
 }
-
 
 private func log4(_ message: @autoclosure () -> String) {
     if debugCleanup {

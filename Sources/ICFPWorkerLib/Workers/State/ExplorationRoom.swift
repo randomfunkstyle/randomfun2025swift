@@ -5,8 +5,13 @@ extension Array where Element == Int {
 }
 
 final class ExplorationRoom: CustomStringConvertible {
+
+    static var nextID = 0
+
     // List of indexeses that this room potentially could be
     var potential: [Int]
+
+    let serializationId: Int
 
     // 100% unique room index
     var index: Int? {
@@ -17,17 +22,19 @@ final class ExplorationRoom: CustomStringConvertible {
     // External label
     let label: Int
     var path: [Int]
-    var doors: [ExploratoinDoor] = (0 ..< 6).map { ExploratoinDoor(id: String($0)) }
+    var doors: [ExploratoinDoor] = (0..<6).map { ExploratoinDoor(id: String($0)) }
 
     init(label: Int, path: [Int], roomsCount: Int) {
         self.label = label
         self.path = path
 
-        var potential = Array<Int>()
-        for i in 0 ..< roomsCount {
+        var potential = [Int]()
+        for i in 0..<roomsCount {
             potential.append(i)
         }
         self.potential = potential
+        self.serializationId = ExplorationRoom.nextID
+        ExplorationRoom.nextID += 1
     }
 
     var description: String {
@@ -42,11 +49,11 @@ final class ExplorationRoom: CustomStringConvertible {
                 return "\(door.id)->nil"
             }
         }.joined(separator: ", ")
-        return "Room(label: \(label), path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
+        return
+            "Room(label: \(label), path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
     }
 }
 
-
 extension [Int] {
-    func asString() -> String { self.map { String($0) }.joined()}
+    func asString() -> String { self.map { String($0) }.joined() }
 }
