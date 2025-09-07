@@ -44,5 +44,9 @@ public struct Problem {
         default: fatalError("Unknown problem: \(name)")
     }
     }
+
+    public static func gridProblems() -> [Problem] {
+        return [iod, teth, hhet, zain, vau, he, daleth, gimel, beth, aleph]
+    }
 }
 

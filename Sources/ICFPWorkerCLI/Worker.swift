@@ -62,7 +62,7 @@ struct CountLines: AsyncParsableCommand {
                 print("Score: \(score)")
 
             case "Grid":
-                let problems: [Problem] = [.aleph]
+                let problems: [Problem] = Problem.gridProblems()
 
                 for depth in 1...2 {
                     for take in 5...6 {
