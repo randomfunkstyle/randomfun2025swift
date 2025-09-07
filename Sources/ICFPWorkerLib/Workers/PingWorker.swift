@@ -156,7 +156,7 @@ public final class PingWorker: Worker {
                     nextQuery.append(.move(door))
                     currentRoom = currentRoom.doors[door].destinationRoom!
                     
-                    if charcoaled[currentRoom.label] == nil {
+                    if charcoaled[currentRoom.label] == nil && Int.random(in: 0 ..< 100) < 30 {
                         let nextLabel = (currentRoom.label + 1) % 4
                         charcoaled[currentRoom.label] = .init(room: currentRoom, prevLabel: currentRoom.label, nextLabel: nextLabel)
                         nextQuery.append(.charcoaled(nextLabel))
@@ -172,13 +172,25 @@ public final class PingWorker: Worker {
             
             // Now we want to add some random move to the query just to make sure that we have longer path
             var itemsAdded = 0
-            while nextQuery.count < maxQuerySize - 12, let safeCurrentRoomRandom = currentRoomRandom {
+            while nextQuery.count < maxQuerySize - 20, let safeCurrentRoomRandom = currentRoomRandom {
                 guard let randomDoor = safeCurrentRoomRandom.doors.filter({ $0.destinationRoom != nil }).randomElement() else {
                     break
                 }
                 nextQuery.append(.move(Int(randomDoor.id)!))
                 
                 currentRoomRandom = randomDoor.destinationRoom
+                
+                if charcoaled[currentRoomRandom!.label] == nil {
+                    if Int.random(in: 0 ..< 100) < 10 || (currentRoomRandom!.index != nil && Int.random(in: 0 ..< 100) < 66) {
+                        if currentRoomRandom!.index != nil {
+                            print("🚁 Charcoaling already bounded room \(currentRoomRandom!)")
+                        }
+                        let nextLabel = (currentRoomRandom!.label + 1) % 4
+                        charcoaled[currentRoomRandom!.label] = .init(room: currentRoomRandom!, prevLabel: currentRoomRandom!.label, nextLabel: nextLabel)
+                        nextQuery.append(.charcoaled(nextLabel))
+                    }
+                }
+
                 
                 itemsAdded += 1
             }
@@ -211,8 +223,11 @@ public final class PingWorker: Worker {
             let querySteps = pingQuery.queryForProcessing
             
             let pointer = RoomState(room: knownState.rootRoom!)
+            //000000000000000000000000000000
+            //000000100000001000000000000000
             
-            print("Explored Results: \(result)")
+            // pointer () ->
+//            print("Explored Results: \(result)")
             
             for i in 0 ..< querySteps.count {
                 let fromDoorC = querySteps[i]
@@ -234,16 +249,20 @@ public final class PingWorker: Worker {
                     // Change Detected therefore we know that it the bounded room we just pinged
                     let charcoaledRoom = pingQuery.charcoaled[destinationRoom.label]!.room
                     if charcoaledRoom !== destinationRoom {
-                        print("🔥 Change Detected for room \(destinationRoom). Previous potential \(destinationRoom.potential):\(charcoaledRoom.potential)")
+                        let previousPotential = destinationRoom.potential
+                        let previousCharcoaledPotential = charcoaledRoom.potential
                         //                    destinationRoom.potential = [charcoaledRoom.index!]
                         // 1,5,6                        5,6,7
                         destinationRoom.potential = destinationRoom.potential.intersection(charcoaledRoom.potential)
                         charcoaledRoom.potential = destinationRoom.potential
                         
-                        print("🔥 Final potential \(destinationRoom.potential)")
-                        
                         // Ideally we want to merge these rooms together, but not right now or NOW
                         // TODO:
+                        var processedPairs: [(Int, Int)] = []
+                        var processedRooms: [ExplorationRoom] = []
+                        _ = knownState.mergeTwoRooms(room1: destinationRoom, room2: charcoaledRoom, processedPairs: &processedPairs, processedRooms: &processedRooms)
+                        
+                        /// MERGE THEM ALL!!!
                     }
                 }
                 // Temporay disabled
@@ -621,7 +640,7 @@ public final class PingWorker: Worker {
 
 // MARK: - Fileprivate Log Functions
 
-private var debugFindEverythingWorker: Bool = true
+private var debugFindEverythingWorker: Bool = false
 private var debugProcessExplored: Bool = false
 
 private var debugCleanup: Bool = false

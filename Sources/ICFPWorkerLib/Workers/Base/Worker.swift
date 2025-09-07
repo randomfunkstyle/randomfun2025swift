@@ -24,7 +24,7 @@ public class Worker {
             iterations += 1
 
             let plans = generatePlans().map { String($0.prefix(maxQuerySize)) }
-            print("Generated plans: \(plans)")
+            print("Generated plans: \(plans.map { $0.prefix(20).map { "\($0)"}.joined() + "..." }) ")
 
             /// Then explore the problem
             let explored = try await client.explore(plans: plans)
