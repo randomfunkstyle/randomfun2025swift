@@ -66,18 +66,20 @@ public final class PingWorker: Worker {
 
     func pingPlans() -> [String] {
         /// Find first room with the potential is like [BoundedRoom + (Not Found Rooms)]
-        let notFounRoomsCount = knownState.totalRoomsCount - knownState.foundUniqueRooms
-
         let boundRooms = knownState.definedRooms.compactMap { $0 }
 
         let pathsWithBoundRooms = boundRooms.compactMap { boundRoom in
             knownState.path(from: boundRoom, with: { room in
-                room.index == nil && (room.potential.count == notFounRoomsCount + 1 || room.potential.count == 2 && notFounRoomsCount == 0) && room.potential.contains(boundRoom.index!)
-            }).map { (bound: boundRoom, potential: (room: $0.1, path: $0.0)) }
+                room.index == nil && room.potential.contains(boundRoom.index!)
+            })
+            .map { (bound: boundRoom, potential: (room: $0.1, path: $0.0)) }
         }
 
+        let sortPotentials = pathsWithBoundRooms.sorted(by: { $0.1.room.potential.count < $1.1.room.potential.count })
+
         // Select one of pathsWithBoundRooms
-        guard let (bound, potential) = pathsWithBoundRooms.first else {
+        let sortedPotentialsWithoutKnown = sortPotentials.first(where: { knownState.path(to: $0.bound) != nil })
+        guard let (bound, potential) = sortedPotentialsWithoutKnown else {
             return []
         }
 
@@ -129,8 +131,6 @@ public final class PingWorker: Worker {
             let door = pointer.room.doors[fromDoor]
             let destinationRoom = door.destinationRoom!
 
-            //                print("Moving from \(pointer.room.label) to door \(fromDoor) expecting label \(destinationRoomLabel) Actual: \(destinationRoom.label)")
-
             // Verify if destination room label is correct
             if destinationRoomLabel != destinationRoom.label, destinationRoom.index == nil {
                 print("🔥 Change Detected for room \(destinationRoom)")
@@ -166,9 +166,8 @@ public final class PingWorker: Worker {
                 }.shuffled().prefix(take)
 
         for room in roomsWeInterstedIn {
-            //            print("🍈 Found oor \(room) with unknown doors")
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
-                print("🍈 Will explore door \(door.id) in room \(room)")
+                print("🌺 explore door \(door.id) in room \(room)")
 
                 for i in 0 ..< 1 {
                     if let path = knownState.path(to: room) {
@@ -335,16 +334,38 @@ public final class PingWorker: Worker {
 
     // return pairs of (door, Label?)
     func parseQuery(_ query: String) -> [(Int, Int?)] {
-        // Remove every '[1]' from the query
-        let query = query
-            .replacingOccurrences(of: "[0]", with: "")
-            .replacingOccurrences(of: "[1]", with: "")
-            .replacingOccurrences(of: "[2]", with: "")
-            .replacingOccurrences(of: "[3]", with: "")
-            .replacingOccurrences(of: "[4]", with: "")
-            .replacingOccurrences(of: "[5]", with: "")
+        var result: [(Int, Int?)] = []
 
-        return query.map { (Int(String($0))!, nil) }
+        var lastDoor: Int? = nil
+        var i: String.Index = query.startIndex
+        while i < query.endIndex {
+            let char = query[i]
+            if let door = Int(String(char)) {
+                if lastDoor != nil {
+                    // previous door didn't have a label
+                    result.append((lastDoor!, nil))
+                }
+                lastDoor = door
+            } else {
+                // parse the [label] bit
+                // skip [
+                i = query.index(after: i)
+                // get label
+                let label = Int(String(query[i]))
+                result.append((lastDoor!, label))
+                lastDoor = nil
+                // skip ]
+                i = query.index(after: i)
+            }
+            i = query.index(after: i)
+        }
+
+        if let lastDoor = lastDoor {
+            // previous door didn't have a label
+            result.append((lastDoor, nil))
+        }
+
+        return result
     }
 
     override public func processExplored(explored: ExploreResponse) {
