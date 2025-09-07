@@ -12,6 +12,9 @@ public class Worker {
         self.problem = problem
     }
 
+    var maxQuerySize: Int { problem.roomsCount * 6 }
+
+
     public func run() async throws {
         /// Firs select the problem
         let selected = try await client.selectProblem(problemName: problem.name)
@@ -20,14 +23,14 @@ public class Worker {
         while shouldContinue(iterations: iterations) {
             iterations += 1
 
-            let plans = generatePlans()
+            let plans = generatePlans().map { String($0.prefix(maxQuerySize)) }
             print("Generated plans: \(plans)")
 
             /// Then explore the problem
             let explored = try await client.explore(plans: plans)
 
             processExplored(explored: explored)
-            print("Explored: [\(explored.queryCount)] \(explored.results) ")
+            print("Explored: [\(explored.queryCount)] \(explored.results.map { $0.prefix(20).map { "\($0)"}.joined() + "..." }) ")
         }
 
         let guess = generateGuess()

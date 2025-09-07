@@ -31,14 +31,26 @@ class KnownState {
         return (definedDoors, undefinedDoors)
     }
 
-    func path(to room: ExplorationRoom) -> [Int]? {
-        var queue = [(room: rootRoom!, path: [Int]())]
+    func moveByPathAndGetLabels(path: [Int]) -> [Int] {
+        var labels: [Int] = []
+        var currentRoom = rootRoom!
+        labels.append(currentRoom.label)
+        for step in path {
+            currentRoom = currentRoom.doors[step].destinationRoom!
+            labels.append(currentRoom.label)
+        }
+        return labels
+    }
+
+    func path(from: ExplorationRoom? = nil,with query: (ExplorationRoom) -> Bool) -> ([Int], ExplorationRoom)? {
+        let from = from ?? rootRoom!
+        var queue = [(room: from, path: [Int]())]
         var visited = [ExplorationRoom]()
 
         while !queue.isEmpty {
             let (current, path) = queue.removeFirst()
-            if current === room {
-                return path
+            if query(current) {
+                return (path, current)
             }
             if visited.contains(where: { $0 === current }) {
                 continue
@@ -52,6 +64,9 @@ class KnownState {
             }
         }
         return nil
+    }
+    func path(to room: ExplorationRoom) -> [Int]? {
+        return path(with: { $0 === room })?.0
     }
 
     func updatePaths() {
@@ -123,7 +138,7 @@ class KnownState {
         compactRooms()
     }
 
-    private func compactRooms() {
+    func compactRooms() {
         // Task for compact is to simplify allVisitedRooms by changing those to defined once and cleanup
         var newUnboundedRooms: [ExplorationRoom] = []
 

@@ -36,8 +36,6 @@ public final class FindEverythingWorker: Worker {
         return it < 500
     }
 
-    private var maxQuerySize: Int { problem.roomsCount * 6 }
-
     private var submittedQueries: [String] = []
     // mapping from label we used on the previous step to our room IDs
     private var assignedLabels: [Int: Int] = [:]

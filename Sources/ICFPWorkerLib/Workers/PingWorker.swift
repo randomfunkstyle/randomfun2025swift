@@ -36,8 +36,6 @@ public final class PingWorker: Worker {
         return it < 500
     }
 
-    private var maxQuerySize: Int { problem.roomsCount * 6 }
-
     private var submittedQueries: [String] = []
     // mapping from label we used on the previous step to our room IDs
     private var assignedLabels: [Int: Int] = [:]
@@ -49,6 +47,146 @@ public final class PingWorker: Worker {
             randomQuery += String(Int.random(in: 0 ..< 6))
         }
         return randomQuery
+    }
+
+    // MARK: - Ping ================================
+
+    private var isPingQuery: Bool = false
+
+    struct PingQuery {
+        let boundRoomIndex: Int
+        let previousLabel: Int
+        let expectedLabel: Int
+        let previousLabels: [Int]
+        let query: String
+        let queryForProcessing: String
+    }
+
+    private var pingQuery: PingQuery?
+
+    func pingPlans() -> [String] {
+        /// Find first room with the potential is like [BoundedRoom + (Not Found Rooms)]
+        let notFounRoomsCount = knownState.totalRoomsCount - knownState.foundUniqueRooms
+
+        let boundRooms = knownState.definedRooms.compactMap { $0 }
+
+        let pathsWithBoundRooms = boundRooms.compactMap { boundRoom in
+            knownState.path(from: boundRoom, with: { room in
+                room.index == nil && (room.potential.count == notFounRoomsCount + 1 || room.potential.count == 2 && notFounRoomsCount == 0) && room.potential.contains(boundRoom.index!)
+            }).map { (bound: boundRoom, potential: (room: $0.1, path: $0.0)) }
+        }
+
+        // Select one of pathsWithBoundRooms
+        guard let (bound, potential) = pathsWithBoundRooms.first else {
+            return []
+        }
+
+        let previousLabel = bound.label
+        let nextLabel = (previousLabel + 1) % 4
+
+        guard let pathToBoundRoom = knownState.path(to: bound) else {
+            // TODO: Add check here... What the hell is going on?
+            return []
+        }
+
+        isPingQuery = true
+
+        pingQuery = PingQuery(
+            boundRoomIndex: bound.index!,
+            previousLabel: previousLabel,
+            expectedLabel: nextLabel,
+            previousLabels: knownState.moveByPathAndGetLabels(path: bound.path + potential.path),
+            query: pathToBoundRoom.asString() + "[\(nextLabel)]" + potential.path.asString(),
+            queryForProcessing: pathToBoundRoom.asString() + "c" + potential.path.asString()
+        )
+
+        print("🔥 Ping query: \(pingQuery!)")
+        print("🔥 Checking behaviour of potential \(potential.room) by \(bound)")
+
+        // This is the mighty query 💪
+        return [pingQuery!.query]
+    }
+
+    func processPingExplored(explored: ExploreResponse) {
+        //        for (query, result) in zip(submittedQueries, explored.results) {
+        let result = explored.results[0]
+        let querySteps = self.pingQuery!.queryForProcessing
+
+        let pingQuery = self.pingQuery!
+
+        let pointer = RoomState(room: knownState.rootRoom!)
+
+        print("Explored Results: \(result)")
+
+        for i in 0 ..< querySteps.count {
+            let fromDoorC = querySteps[querySteps.index(querySteps.startIndex, offsetBy: i)]
+            guard let fromDoor = Int(String(fromDoorC)) else {
+                continue
+            }
+
+            let destinationRoomLabel = result[i + 1]
+
+            let door = pointer.room.doors[fromDoor]
+            let destinationRoom = door.destinationRoom!
+
+            //                print("Moving from \(pointer.room.label) to door \(fromDoor) expecting label \(destinationRoomLabel) Actual: \(destinationRoom.label)")
+
+            // Verify if destination room label is correct
+            if destinationRoomLabel != destinationRoom.label, destinationRoom.index == nil {
+                print("🔥 Change Detected for room \(destinationRoom)")
+                // Change Detected therefore we know that it the bounded room we just pinged
+                destinationRoom.potential = [pingQuery.boundRoomIndex]
+
+            } else if destinationRoomLabel == destinationRoom.label, i == querySteps.count - 1 {
+                // We changed that bounded one, but we didn't see the expect change in the potential
+                destinationRoom.potential.remove(pingQuery.boundRoomIndex)
+
+                print("🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at lease we removed one potential \(pingQuery.boundRoomIndex)")
+            }
+
+            pointer.room = destinationRoom
+        }
+        //        }
+        // TODO: We only need to optimize and mark
+        knownState.addRoomAndCompactRooms(pointer.room)
+        isPingQuery = false
+    }
+
+    // MARK: - Regular ================================
+
+    func pingExplorationPlans() -> [String] {
+        var plans: [String] = []
+
+        let roomsWeInterstedIn =
+            knownState.definedRooms
+                .compactMap { $0 }
+                .filter { pingQuery?.boundRoomIndex == $0.index }
+                .filter { room in
+                    room.doors.contains(where: { $0.destinationRoom == nil })
+                }.shuffled().prefix(take)
+
+        for room in roomsWeInterstedIn {
+            //            print("🍈 Found oor \(room) with unknown doors")
+            for door in room.doors.filter({ $0.destinationRoom == nil }) {
+                print("🍈 Will explore door \(door.id) in room \(room)")
+
+                for i in 0 ..< 1 {
+                    if let path = knownState.path(to: room) {
+                        let additionalQuer = path + [Int(door.id)!, i]
+                        let additionalQueryString =
+                            additionalQuer.map { String($0) }.joined()
+                                + generateRandomQuery()
+                        let final = String(additionalQueryString.prefix(maxQuerySize))
+                        plans.append(final)
+                    }
+                }
+            }
+        }
+
+        if !plans.isEmpty {
+            print("🎃 Using ping priority plans")
+        }
+        return plans
     }
 
     func regularPlans() -> [String] {
@@ -121,6 +259,8 @@ public final class PingWorker: Worker {
         submittedQueries = []
 
         let generators: [() -> [String]] = [
+            pingPlans,
+            pingExplorationPlans,
             regularPlans,
             fancyPlans,
             randomPlans,
@@ -195,41 +335,24 @@ public final class PingWorker: Worker {
 
     // return pairs of (door, Label?)
     func parseQuery(_ query: String) -> [(Int, Int?)] {
-        var result: [(Int, Int?)] = []
+        // Remove every '[1]' from the query
+        let query = query
+            .replacingOccurrences(of: "[0]", with: "")
+            .replacingOccurrences(of: "[1]", with: "")
+            .replacingOccurrences(of: "[2]", with: "")
+            .replacingOccurrences(of: "[3]", with: "")
+            .replacingOccurrences(of: "[4]", with: "")
+            .replacingOccurrences(of: "[5]", with: "")
 
-        var lastDoor: Int? = nil
-        var i: String.Index = query.startIndex
-        while i < query.endIndex {
-            let char = query[i]
-            if let door = Int(String(char)) {
-                if lastDoor != nil {
-                    // previous door didn't have a label
-                    result.append((lastDoor!, nil))
-                }
-                lastDoor = door
-            } else {
-                // parse the [label] bit
-                // skip [
-                i = query.index(after: i)
-                // get label
-                let label = Int(String(query[i]))
-                result.append((lastDoor!, label))
-                lastDoor = nil
-                // skip ]
-                i = query.index(after: i)
-            }
-            i = query.index(after: i)
-        }
-
-        if let lastDoor = lastDoor {
-            // previous door didn't have a label
-            result.append((lastDoor, nil))
-        }
-
-        return result
+        return query.map { (Int(String($0))!, nil) }
     }
 
     override public func processExplored(explored: ExploreResponse) {
+        if isPingQuery {
+            processPingExplored(explored: explored)
+            return
+        }
+
         for (query, result) in zip(submittedQueries, explored.results) {
             let querySteps = parseQuery(query)
 
@@ -330,7 +453,6 @@ private func log2(_ message: @autoclosure () -> String) {
         print("[ProcessExplored] \(message())")
     }
 }
-
 
 private func log4(_ message: @autoclosure () -> String) {
     if debugCleanup {

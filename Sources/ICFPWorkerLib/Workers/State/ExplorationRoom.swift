@@ -39,3 +39,8 @@ final class ExplorationRoom: CustomStringConvertible {
         return "Room(label: \(label), path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
     }
 }
+
+
+extension [Int] {
+    func asString() -> String { self.map { String($0) }.joined()}
+}
