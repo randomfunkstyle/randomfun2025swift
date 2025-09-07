@@ -83,9 +83,9 @@ public final class PingWorker: Worker {
         }
         var charcoaled: Dictionary<Label, CharCoaled>
         
-        let previousLabels: [Int]
         let query: String
         let queryForProcessing: [QueryMove]
+        let destinationIndex: Int
     }
 
     enum QueryMove {
@@ -110,7 +110,7 @@ public final class PingWorker: Worker {
             knownState.path(
                 from: boundRoom,
                 with: { room in
-                    room.index == nil && room.potential.contains(boundRoom.index!)
+                    room.index == nil && room.potential.contains(boundRoom.index!) && room.label == boundRoom.label
                 }
             )
             .map { (bound: boundRoom, potential: (room: $0.1, path: $0.0)) }
@@ -141,8 +141,13 @@ public final class PingWorker: Worker {
 
      
         let initialQuery = pathToBoundRoom.map { QueryMove.move($0) } + [QueryMove.charcoaled(nextLabel)] + potential.path.map { QueryMove.move($0) }
+        var destinationIndex = initialQuery.count - 1
 
-        var charcoaled: Dictionary<Label, PingQuery.CharCoaled> = [previousLabel: .init(room: bound, prevLabel: previousLabel, nextLabel: nextLabel)]
+        
+
+        var charcoaled: Dictionary<Label, PingQuery.CharCoaled> = [
+            previousLabel: .init(room: bound, prevLabel: previousLabel, nextLabel: nextLabel)
+        ]
 
         var nextQuery: [QueryMove] = []
         var currentRoom = knownState.rootRoom!
@@ -156,6 +161,7 @@ public final class PingWorker: Worker {
                     let nextLabel = (currentRoom.label + 1) % 4
                     charcoaled[currentRoom.label] = .init(room: currentRoom, prevLabel: currentRoom.label, nextLabel: nextLabel)
                     nextQuery.append(.charcoaled(nextLabel))
+                    destinationIndex += 1
                 }
 
             case .charcoaled(let label):
@@ -163,14 +169,35 @@ public final class PingWorker: Worker {
             }
         }
 
+        var currentRoomRandom: ExplorationRoom? = currentRoom
+
+        // Now we want to add some random move to the query just to make sure that we have longer path
+        var itemsAdded = 0 
+        while nextQuery.count < maxQuerySize - 12, let safeCurrentRoomRandom = currentRoomRandom  {
+            guard let randomDoor = safeCurrentRoomRandom.doors.filter({ $0.destinationRoom != nil }).randomElement() else {
+                break
+            }
+            nextQuery.append(.move(Int(randomDoor.id)!))
+
+            currentRoomRandom = randomDoor.destinationRoom
+
+            itemsAdded += 1
+        }
+
+        print("🔥 Added \(itemsAdded) random items to the query")
+
+
         pingQuery = PingQuery(
             charcoaled: charcoaled,
-            previousLabels: knownState.moveByPathAndGetLabels(path: bound.path + potential.path),
             query: nextQuery.toQueryString,
-            queryForProcessing: nextQuery
+            queryForProcessing: nextQuery,
+            destinationIndex: destinationIndex
         )
 
-        print("🔥 Ping query: \(pingQuery!)")
+        // [.move(1)]
+        // 0,1
+
+        print("🔥 Ping query: \(pingQuery!.query)")
         print("🔥 Checking behaviour of potential \(potential.room) by \(bound) and chalkoaling \(charcoaled.keys.sorted())")
 
         // This is the mighty query 💪  PingQuery.query
@@ -216,7 +243,9 @@ public final class PingWorker: Worker {
                     // TODO:
                 }
 
-            } else if recievedRoomLabel == destinationRoom.label, i == querySteps.count - 1 {
+            } 
+            // Temporay disabled
+            else if recievedRoomLabel == destinationRoom.label, i == pingQuery.destinationIndex {
                 // We changed that bounded one, but we didn't see the expect change in the potential
                 let charcoaledRoom = pingQuery.charcoaled[destinationRoom.label]!.room
                 guard let charcoaledRoomIndex = charcoaledRoom.index else {
