@@ -20,6 +20,29 @@ public struct Problem {
     public static let zain = Problem(roomsCount: 36, name: "zain", complicated: true)
     public static let hhet = Problem(roomsCount: 54, name: "hhet", complicated: true)
     public static let teth = Problem(roomsCount: 72, name: "teth", complicated: true)
+    
     public static let iod = Problem(roomsCount: 90, name: "iod", complicated: true)
+
+    public static func fromName(name: String) -> Problem {
+        switch name {
+        case "probatio": return probatio
+        case "primus": return primus
+        case "secundus": return secundus
+        case "tertius": return tertius  
+        case "quartus": return quartus
+        case "quintus": return quintus
+        case "aleph": return aleph
+        case "beth": return beth
+        case "gimel": return gimel
+        case "daleth": return daleth
+        case "he": return he
+        case "vau": return vau
+        case "zain": return zain
+        case "hhet": return hhet
+        case "teth": return teth
+        case "iod": return iod
+        default: fatalError("Unknown problem: \(name)")
+    }
+    }
 }
 
