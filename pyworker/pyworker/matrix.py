@@ -102,8 +102,6 @@ def calc_entropy(matrix: np.ndarray) -> float:
 
 def count_non_zero(matrix: np.ndarray) -> int:
     """Count non-zero elements in matrix."""
-    # return np.sum(matrix > LEAST_NONZERO_MAGNITUDE)
-    # that was wrong as it returns bool
     return np.count_nonzero(matrix).item()
 
 
@@ -125,6 +123,17 @@ def is_valid(matrix: np.ndarray) -> bool:
             return False
 
     return True
+
+
+def break_connections(matrix: np.ndarray, from_index: int, to_index: int) -> np.ndarray:
+    copy = matrix.copy()
+    copy[from_index, to_index] = 0.0
+    copy[to_index, from_index] = 0.0
+
+    if is_valid(copy):
+        return soft_max(copy)
+
+    return matrix
 
 
 def print_matrix(matrix: np.ndarray) -> None:
