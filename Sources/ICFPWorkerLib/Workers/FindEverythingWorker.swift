@@ -452,6 +452,8 @@ public final class FindEverythingWorker: Worker {
     }
 
     private var submittedQueries: [String] = []
+    // mapping from label we used on the previous step to our room IDs
+    private var assignedLabels: [Int: Int] = [:]
 
     func generateRandomQuery() -> String {
         var randomQuery = ""
@@ -512,6 +514,16 @@ public final class FindEverythingWorker: Worker {
 
     func randomPlans() -> [String] {
         return [generateRandomQuery()]
+    }
+
+    func complexPlans() -> [String] {
+        if !problem.complicated {
+            return []
+        }
+
+        var plans: [String] = []
+
+        return plans
     }
 
     override public func generatePlans() -> [String] {
@@ -601,14 +613,46 @@ public final class FindEverythingWorker: Worker {
         }
     }
 
+    // return pairs of (door, Label?)
+    func parseQuery(_ query: String) -> [(Int, Int?)] {
+        var result: [(Int, Int?)] = []
+
+        var lastDoor: Int? = nil
+        var i: String.Index = query.startIndex
+        while i < query.endIndex {
+            let char = query[i]
+            if let door = Int(String(char)) {
+                if lastDoor != nil {
+                    // previous door didn't have a label
+                    result.append((lastDoor!, nil))
+                }
+                lastDoor = door
+            } else {
+                // parse the [label] bit
+                // skip [
+                i = query.index(after: i)
+                // get label
+                let label = Int(String(query[i]))
+                result.append((lastDoor!, label))
+                lastDoor = nil
+                // skip ]
+                i = query.index(after: i)
+            }
+            i = query.index(after: i)
+        }
+
+        if let lastDoor = lastDoor {
+            // previous door didn't have a label
+            result.append((lastDoor, nil))
+        }
+
+        return result
+    }
+
     override public func processExplored(explored: ExploreResponse) {
         for (query, result) in zip(submittedQueries, explored.results) {
 
-            // q:0
-            // R:0 -> 1
-
-            // 0 -0> 1
-            let querySteps = query.split(separator: "").map { Int(String($0))! }
+            let querySteps = parseQuery(query)
 
             var currentPath: [Int] = []
 
@@ -624,7 +668,7 @@ public final class FindEverythingWorker: Worker {
             let pointer = RoomState(room: currentRoom)
 
             for i in 0..<querySteps.count {
-                let fromDoor = querySteps[i]
+                let (fromDoor, label) = querySteps[i]
                 let fromRoom = result[i]
                 let toRoom = result[i + 1]
 
