@@ -390,12 +390,12 @@ class KnownState {
     func isDifferent(room: ExplorationRoom, definedRoom: ExplorationRoom, depth: Int)
         -> Bool
     {
-        return measureTwoVariants(
-            "BFS",
-            bfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth),
-            "DFS",
+//        return measureTwoVariants(
+//            "BFS",
+//            bfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth),
+//            "DFS",
             dfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth)
-        )
+//        )
     }
 
     private func addRoom(_ room: ExplorationRoom) {

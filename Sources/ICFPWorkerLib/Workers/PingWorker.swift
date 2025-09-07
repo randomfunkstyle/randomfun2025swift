@@ -73,13 +73,31 @@ public final class PingWorker: Worker {
 
     private var isPingQuery: Bool = false
 
+    typealias Label = Int
     struct PingQuery {
-        let boundRoomIndex: Int
-        let previousLabel: Int
-        let expectedLabel: Int
+
+        struct CharCoaled {
+            let room: ExplorationRoom
+            let prevLabel: Int
+            let nextLabel: Int
+        }
+        var charcoaled: Dictionary<Label, CharCoaled>
+        
         let previousLabels: [Int]
         let query: String
-        let queryForProcessing: String
+        let queryForProcessing: [QueryMove]
+    }
+
+    enum QueryMove {
+        case move(Int)
+        case charcoaled(Int)
+
+        var asString: String {
+            switch self {
+            case .move(let door): String(door)
+            case .charcoaled(let label): "[\(label)]"
+            }
+        }
     }
 
     private var pingQuery: PingQuery?
@@ -115,24 +133,47 @@ public final class PingWorker: Worker {
 
         guard let pathToBoundRoom = knownState.path(to: bound) else {
             // TODO: Add check here... What the hell is going on?
+            // Why is it ever possible?
             return []
         }
 
         isPingQuery = true
 
+     
+        let initialQuery = pathToBoundRoom.map { QueryMove.move($0) } + [QueryMove.charcoaled(nextLabel)] + potential.path.map { QueryMove.move($0) }
+
+        var charcoaled: Dictionary<Label, PingQuery.CharCoaled> = [previousLabel: .init(room: bound, prevLabel: previousLabel, nextLabel: nextLabel)]
+
+        var nextQuery: [QueryMove] = []
+        var currentRoom = knownState.rootRoom!
+        for move in initialQuery {
+            switch move {
+            case .move(let door):
+                nextQuery.append(.move(door))
+                currentRoom = currentRoom.doors[door].destinationRoom!
+                
+                if charcoaled[currentRoom.label] == nil {
+                    let nextLabel = (currentRoom.label + 1) % 4
+                    charcoaled[currentRoom.label] = .init(room: currentRoom, prevLabel: currentRoom.label, nextLabel: nextLabel)
+                    nextQuery.append(.charcoaled(nextLabel))
+                }
+
+            case .charcoaled(let label):
+                nextQuery.append(.charcoaled(label))
+            }
+        }
+
         pingQuery = PingQuery(
-            boundRoomIndex: bound.index!,
-            previousLabel: previousLabel,
-            expectedLabel: nextLabel,
+            charcoaled: charcoaled,
             previousLabels: knownState.moveByPathAndGetLabels(path: bound.path + potential.path),
-            query: pathToBoundRoom.asString() + "[\(nextLabel)]" + potential.path.asString(),
-            queryForProcessing: pathToBoundRoom.asString() + "c" + potential.path.asString()
+            query: nextQuery.toQueryString,
+            queryForProcessing: nextQuery
         )
 
         print("🔥 Ping query: \(pingQuery!)")
-        print("🔥 Checking behaviour of potential \(potential.room) by \(bound)")
+        print("🔥 Checking behaviour of potential \(potential.room) by \(bound) and chalkoaling \(charcoaled.keys.sorted())")
 
-        // This is the mighty query 💪
+        // This is the mighty query 💪  PingQuery.query
         return [pingQuery!.query]
     }
 
@@ -148,28 +189,43 @@ public final class PingWorker: Worker {
         print("Explored Results: \(result)")
 
         for i in 0..<querySteps.count {
-            let fromDoorC = querySteps[querySteps.index(querySteps.startIndex, offsetBy: i)]
-            guard let fromDoor = Int(String(fromDoorC)) else {
+            let fromDoorC = querySteps[i]
+            guard  case let .move(fromDoor) = fromDoorC else {
                 continue
             }
 
-            let destinationRoomLabel = result[i + 1]
+            let recievedRoomLabel = result[i + 1]
 
             let door = pointer.room.doors[fromDoor]
             let destinationRoom = door.destinationRoom!
 
             // Verify if destination room label is correct
-            if destinationRoomLabel != destinationRoom.label, destinationRoom.index == nil {
-                print("🔥 Change Detected for room \(destinationRoom)")
+            if recievedRoomLabel != destinationRoom.label, destinationRoom.index == nil {
                 // Change Detected therefore we know that it the bounded room we just pinged
-                destinationRoom.potential = [pingQuery.boundRoomIndex]
+                let charcoaledRoom = pingQuery.charcoaled[destinationRoom.label]!.room
+                if charcoaledRoom !== destinationRoom {
+                    print("🔥 Change Detected for room \(destinationRoom). Previous potential \(destinationRoom.potential):\(charcoaledRoom.potential)")
+//                    destinationRoom.potential = [charcoaledRoom.index!]
+                    // 1,5,6                        5,6,7
+                    destinationRoom.potential = destinationRoom.potential.intersection(charcoaledRoom.potential)
+                    charcoaledRoom.potential = destinationRoom.potential
 
-            } else if destinationRoomLabel == destinationRoom.label, i == querySteps.count - 1 {
+                    print("🔥 Final potential \(destinationRoom.potential)")
+
+                    // Ideally we want to merge these rooms together, but not right now or NOW
+                    // TODO:
+                }
+
+            } else if recievedRoomLabel == destinationRoom.label, i == querySteps.count - 1 {
                 // We changed that bounded one, but we didn't see the expect change in the potential
-                destinationRoom.potential.remove(pingQuery.boundRoomIndex)
+                let charcoaledRoom = pingQuery.charcoaled[destinationRoom.label]!.room
+                guard let charcoaledRoomIndex = charcoaledRoom.index else {
+                    fatalError("Charcoaled room \(charcoaledRoom) has no index")
+                }
+                destinationRoom.potential.remove(charcoaledRoomIndex)
 
                 print(
-                    "🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at lease we removed one potential \(pingQuery.boundRoomIndex)"
+                    "🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at laest we removed one potential \(charcoaledRoomIndex)"
                 )
             }
 
@@ -189,7 +245,11 @@ public final class PingWorker: Worker {
         let roomsWeInterstedIn =
             knownState.definedRooms
             .compactMap { $0 }
-            .filter { pingQuery?.boundRoomIndex == $0.index }
+            .filter { room in
+                guard let charcoaled = pingQuery?.charcoaled else {
+                    return false
+                }
+                return charcoaled.values.contains(where: { ch in ch.room.index == room.index}) }
             .filter { room in
                 room.doors.contains(where: { $0.destinationRoom == nil })
             }.shuffled().prefix(take)
@@ -529,5 +589,12 @@ private func log2(_ message: @autoclosure () -> String) {
 private func log4(_ message: @autoclosure () -> String) {
     if debugCleanup {
         print("[Cleanup] \(message())")
+    }
+}
+
+@available(macOS 13.0, *)
+extension Array<PingWorker.QueryMove> {
+    var toQueryString: String {
+        return self.map { $0.asString }.joined()
     }
 }
