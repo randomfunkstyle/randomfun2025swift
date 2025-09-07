@@ -1,0 +1,460 @@
+[
+  {
+    "timestamp": "2025-09-07T20:33:20.329966",
+    "iterationnumber": 0,
+    "current_querypath": "",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        }
+      ],
+      "edges": []
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:21.329966",
+    "iterationnumber": 1,
+    "current_querypath": "0",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:22.329966",
+    "iterationnumber": 2,
+    "current_querypath": "1",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        },
+        {
+          "id": "1",
+          "label": "C"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        },
+        {
+          "source": "START",
+          "target": "1",
+          "door": 1
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:23.329966",
+    "iterationnumber": 3,
+    "current_querypath": "2",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        },
+        {
+          "id": "1",
+          "label": "C"
+        },
+        {
+          "id": "2",
+          "label": "D"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        },
+        {
+          "source": "START",
+          "target": "1",
+          "door": 1
+        },
+        {
+          "source": "START",
+          "target": "2",
+          "door": 2
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:24.329966",
+    "iterationnumber": 4,
+    "current_querypath": "3",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        },
+        {
+          "id": "1",
+          "label": "C"
+        },
+        {
+          "id": "2",
+          "label": "D"
+        },
+        {
+          "id": "3",
+          "label": "A"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        },
+        {
+          "source": "START",
+          "target": "1",
+          "door": 1
+        },
+        {
+          "source": "START",
+          "target": "2",
+          "door": 2
+        },
+        {
+          "source": "START",
+          "target": "3",
+          "door": 3
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:25.329966",
+    "iterationnumber": 5,
+    "current_querypath": "4",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        },
+        {
+          "id": "1",
+          "label": "C"
+        },
+        {
+          "id": "2",
+          "label": "D"
+        },
+        {
+          "id": "3",
+          "label": "A"
+        },
+        {
+          "id": "4",
+          "label": "B"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        },
+        {
+          "source": "START",
+          "target": "1",
+          "door": 1
+        },
+        {
+          "source": "START",
+          "target": "2",
+          "door": 2
+        },
+        {
+          "source": "START",
+          "target": "3",
+          "door": 3
+        },
+        {
+          "source": "START",
+          "target": "4",
+          "door": 4
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:26.329966",
+    "iterationnumber": 6,
+    "current_querypath": "5",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        },
+        {
+          "id": "1",
+          "label": "C"
+        },
+        {
+          "id": "2",
+          "label": "D"
+        },
+        {
+          "id": "3",
+          "label": "A"
+        },
+        {
+          "id": "4",
+          "label": "B"
+        },
+        {
+          "id": "5",
+          "label": "A"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        },
+        {
+          "source": "START",
+          "target": "1",
+          "door": 1
+        },
+        {
+          "source": "START",
+          "target": "2",
+          "door": 2
+        },
+        {
+          "source": "START",
+          "target": "3",
+          "door": 3
+        },
+        {
+          "source": "START",
+          "target": "4",
+          "door": 4
+        },
+        {
+          "source": "START",
+          "target": "5",
+          "door": 5
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:27.329966",
+    "iterationnumber": 7,
+    "current_querypath": "00",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        },
+        {
+          "id": "1",
+          "label": "C"
+        },
+        {
+          "id": "2",
+          "label": "D"
+        },
+        {
+          "id": "3",
+          "label": "A"
+        },
+        {
+          "id": "4",
+          "label": "B"
+        },
+        {
+          "id": "5",
+          "label": "A"
+        },
+        {
+          "id": "00",
+          "label": "C"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        },
+        {
+          "source": "START",
+          "target": "1",
+          "door": 1
+        },
+        {
+          "source": "START",
+          "target": "2",
+          "door": 2
+        },
+        {
+          "source": "START",
+          "target": "3",
+          "door": 3
+        },
+        {
+          "source": "START",
+          "target": "4",
+          "door": 4
+        },
+        {
+          "source": "START",
+          "target": "5",
+          "door": 5
+        },
+        {
+          "source": "0",
+          "target": "00",
+          "door": 0
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-09-07T20:33:28.329966",
+    "iterationnumber": 8,
+    "current_querypath": "01",
+    "current_graph": {
+      "nodes": [
+        {
+          "id": "START",
+          "label": "A"
+        },
+        {
+          "id": "0",
+          "label": "B"
+        },
+        {
+          "id": "1",
+          "label": "C"
+        },
+        {
+          "id": "2",
+          "label": "D"
+        },
+        {
+          "id": "3",
+          "label": "A"
+        },
+        {
+          "id": "4",
+          "label": "B"
+        },
+        {
+          "id": "5",
+          "label": "A"
+        },
+        {
+          "id": "00",
+          "label": "C"
+        },
+        {
+          "id": "01",
+          "label": "D"
+        }
+      ],
+      "edges": [
+        {
+          "source": "START",
+          "target": "0",
+          "door": 0
+        },
+        {
+          "source": "START",
+          "target": "1",
+          "door": 1
+        },
+        {
+          "source": "START",
+          "target": "2",
+          "door": 2
+        },
+        {
+          "source": "START",
+          "target": "3",
+          "door": 3
+        },
+        {
+          "source": "START",
+          "target": "4",
+          "door": 4
+        },
+        {
+          "source": "START",
+          "target": "5",
+          "door": 5
+        },
+        {
+          "source": "0",
+          "target": "00",
+          "door": 0
+        },
+        {
+          "source": "0",
+          "target": "01",
+          "door": 1
+        }
+      ]
+    }
+  }
+]

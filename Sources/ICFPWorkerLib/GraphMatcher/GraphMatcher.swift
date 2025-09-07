@@ -183,13 +183,44 @@ public class GraphMatcher {
     ///   - expectedRoomCount: Number of unique rooms expected
     ///   - maxQueries: Maximum number of exploration queries allowed
     ///   - maxDepth: Maximum exploration depth for paths
+    ///   - useOptimizedStrategy: Use long path optimization (1 query instead of many)
     /// - Returns: Result containing unique rooms, node groupings, and statistics
     public func identifyRooms(
         sourceGraph: Graph,
         expectedRoomCount: Int,
         maxQueries: Int = 100,
-        maxDepth: Int = 3
+        maxDepth: Int = 3,
+        useOptimizedStrategy: Bool = false
     ) -> RoomIdentificationResult {
+        
+        // If optimized strategy is requested, use LongPathExplorer
+        if useOptimizedStrategy {
+            let explorer = LongPathExplorer()
+            let result = explorer.identifyRoomsOptimized(
+                sourceGraph: sourceGraph,
+                expectedRooms: expectedRoomCount
+            )
+            
+            // Convert to RoomIdentificationResult format
+            // Group the fingerprints by their normalized patterns
+            let groups = explorer.groupFingerprintsByPattern(result.fingerprints)
+            var roomGroups: [[Int]] = []
+            for (_, paths) in groups {
+                // Convert paths to node IDs (using path length as proxy for node ID)
+                let nodeIds = paths.map { $0.isEmpty ? 0 : $0.count }
+                roomGroups.append(nodeIds)
+            }
+            
+            // Create a dummy graph for compatibility
+            let dummyGraph = Graph(startingLabel: .A)
+            
+            return RoomIdentificationResult(
+                uniqueRooms: result.uniqueRooms,
+                roomGroups: roomGroups,
+                queryCount: result.queryCount,
+                graph: dummyGraph
+            )
+        }
         
         var queryCount = 0
         var exploredPaths = Set<String>()

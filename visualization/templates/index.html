@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Exploration Visualizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗺️ Graph Exploration Visualizer</h1>
+            <div class="info-panel">
+                <div class="info-item">
+                    <label>Timestamp:</label>
+                    <span id="timestamp">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Iteration:</label>
+                    <span id="iteration">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Query Path:</label>
+                    <span id="querypath" class="code">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Nodes:</label>
+                    <span id="nodecount">0</span>
+                </div>
+                <div class="info-item">
+                    <label>Edges:</label>
+                    <span id="edgecount">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="controls">
+            <button id="prevBtn" onclick="previousState()" disabled>
+                ← Previous
+            </button>
+            <div class="state-indicator">
+                <span id="currentState">0</span> / <span id="totalStates">0</span>
+            </div>
+            <button id="nextBtn" onclick="nextState()" disabled>
+                Next →
+            </button>
+            <div class="separator"></div>
+            <button id="playBtn" onclick="togglePlay()">
+                ▶️ Play
+            </button>
+            <button onclick="resetView()">
+                🔄 Reset View
+            </button>
+            <div class="separator"></div>
+            <button id="autoFollowBtn" onclick="toggleAutoFollow()" class="auto-follow-off">
+                📍 Auto-Follow: OFF
+            </button>
+            <div id="liveIndicator" class="live-indicator hidden">
+                <span class="live-dot"></span> LIVE
+            </div>
+            <div class="separator"></div>
+            <button id="autoGenBtn" onclick="toggleAutoGeneration()" class="auto-gen-off">
+                🤖 Auto-Generate: OFF
+            </button>
+            <div class="separator"></div>
+            <label for="speedSlider">Speed:</label>
+            <input type="range" id="speedSlider" min="100" max="2000" value="1000" step="100">
+            <span id="speedValue">1.0s</span>
+        </div>
+
+        <div class="legend">
+            <h3>Room Labels</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff7f7f;"></div>
+                    <span>A</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #7f7fff;"></div>
+                    <span>B</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #7fff7f;"></div>
+                    <span>C</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffff7f;"></div>
+                    <span>D</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="visualization">
+            <svg id="graph-svg"></svg>
+            <div class="zoom-info" id="zoomInfo">
+                Zoom: <span id="zoomLevel">100%</span> | 
+                Nodes: <span id="visibleNodes">0</span> | 
+                Mode: <span id="renderMode">SVG</span>
+            </div>
+        </div>
+
+        <div class="file-controls">
+            <input type="file" id="fileInput" accept=".json,.jsonl" style="display: none;" onchange="handleFileSelect(event)">
+            <button onclick="document.getElementById('fileInput').click()" class="file-select-btn">
+                📁 Choose File
+            </button>
+            <span id="selectedFile">No file selected</span>
+            <button onclick="loadSelectedFile()" id="loadBtn" disabled>
+                Load File
+            </button>
+            <span id="loadStatus"></span>
+            <div class="separator"></div>
+            <input type="text" id="filepath" placeholder="Or enter path..." value="graph_states.jsonl" style="width: 200px;">
+            <button onclick="loadFile()">Load Path</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='graph_viz.js') }}"></script>
+</body>
+</html>
