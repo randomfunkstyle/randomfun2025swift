@@ -51,6 +51,6 @@ public class EnvConfig {
         teamId = config["teamId"] ?? "nil"
         apiUrl = config["apiUrl"] ?? "nil"
 
-        print("Loaded config: teamId=\(teamId), apiUrl=\(apiUrl)")
+        //print("Loaded config: teamId=\(teamId), apiUrl=\(apiUrl)")
     }
 }

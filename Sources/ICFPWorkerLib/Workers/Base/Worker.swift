@@ -26,20 +26,20 @@ public class Worker {
 
             let plans = generatePlans().map { String($0.prefix(maxQuerySize)) }
             currentScore += 1 + plans.count
-            print(
-                "Generated plans: \(plans.map { $0.prefix(20).map { "\($0)"}.joined() + "..." }) ")
+            //print(
+            //    "Generated plans: \(plans.map { $0.prefix(20).map { "\($0)"}.joined() + "..." }) ")
 
             /// Then explore the problem
             let explored = try await client.explore(plans: plans)
 
             processExplored(explored: explored)
-            print(
-                "Explored: [\(explored.queryCount)] \(explored.results.map { $0.prefix(20).map { "\($0)"}.joined() + "..." }) "
-            )
+            // print(
+            //     "Explored: [\(explored.queryCount)] \(explored.results.map { $0.prefix(20).map { "\($0)"}.joined() + "..." }) "
+            // )
 
             if currentScore >= previousScore {
                 print("Current score \(currentScore) >= previous score \(previousScore), stopping")
-                return nil
+                return -1
             }
         }
 

@@ -64,16 +64,24 @@ struct CountLines: AsyncParsableCommand {
             case "Grid":
                 let problems: [Problem] = [.aleph]
 
-                for p in problems {
-                    for depth in 1...2 {
-                        for take in 5...6 {
-                            print("Running with depth \(depth) and take \(take)")
+                for depth in 1...2 {
+                    for take in 5...6 {
+                         for p in problems {
+                            print("Running problem \(p.name) with depth \(depth) and take \(take)")
                             if #available(macOS 13.0, *) {
-                                try await PingWorker(
-                                    problem: p, client: HTTPExplorationClient(),
-                                    depth: depth,
-                                    take: take
-                                ).run()
+
+                                for retry: Int in 1...5 {
+                                    if let res = try await PingWorker(
+                                        problem: p, client: HTTPExplorationClient(),
+                                        depth: depth,
+                                        take: take
+                                    ).run() {
+                                        print("Found solution with \(res)")
+                                        break
+                                    }
+                                    print("retrying \(retry)")
+                                }
+
                             }
                         }
                     }

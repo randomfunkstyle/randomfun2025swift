@@ -458,7 +458,7 @@ private func log3(_ message: @autoclosure () -> String) {
     }
 }
 
-private var debugKnownState: Bool = true
+private var debugKnownState: Bool = false 
 private func logKnownState(_ message: @autoclosure () -> String) {
     if debugKnownState {
         print("[KnownState] \(message())")

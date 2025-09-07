@@ -6,7 +6,7 @@ public final class PingWorker: Worker {
     private var knownState: KnownState
     
     public init(
-        problem: Problem, client: ExplorationClient, depth: Int, take: Int, debug: Bool = true
+        problem: Problem, client: ExplorationClient, depth: Int, take: Int, debug: Bool = false
     ) {
         knownState = KnownState(totalRoomsCount: problem.roomsCount, depth: depth)
         debugFindEverythingWorker = debug
@@ -19,17 +19,17 @@ public final class PingWorker: Worker {
     override public func shouldContinue(iterations it: Int) -> Bool {
         // Let's count found unique rooms
         let uniqueRooms = knownState.foundUniqueRooms
-        print("!!!Unique rooms found: \(uniqueRooms)/\(problem.roomsCount)")
+        //print("!!!Unique rooms found: \(uniqueRooms)/\(problem.roomsCount)")
         
         let (definedDoors, undefinedDoors, zeroDoors) = knownState.boundAndUnboundDoors()
         
         let totalDoors = problem.roomsCount * 6
         let percentageOfDefinedDoors: Int = definedDoors * 100 / totalDoors
-        if undefinedDoors != 0 {
-            print(
-                "😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors of \(totalDoors) (\(percentageOfDefinedDoors)%)"
-            )
-        }
+        // if undefinedDoors != 0 {
+        //     print(
+        //         "😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors of \(totalDoors) (\(percentageOfDefinedDoors)%)"
+        //     )
+        // }
         
         if uniqueRooms == problem.roomsCount && zeroDoors == 0 && undefinedDoors == 0 {
             print("Everything is FINE 🔥")
@@ -240,7 +240,7 @@ public final class PingWorker: Worker {
                 let door = pointer.room.doors[fromDoor]
                 // We saw this path before, therefore we should be able to follow it
                 guard let destinationRoom = door.destinationRoom else {
-                    print("Failed to process (Broken doors. Check the Merging")
+                    //print("Failed to process (Broken doors. Check the Merging")
                     break
                 }
                 
@@ -630,9 +630,9 @@ public final class PingWorker: Worker {
             Logger.shared.log(logState: logState)
         }
         
-        log(
-            "[Compact]  rooms found: \(knownState.foundUniqueRooms)/\(knownState.unboundedRooms.count)"
-        )
+        // log(
+        //     "[Compact]  rooms found: \(knownState.foundUniqueRooms)/\(knownState.unboundedRooms.count)"
+        // )
         
         log2("Known state: \(knownState)")
     }
