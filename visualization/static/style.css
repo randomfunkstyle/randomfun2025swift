@@ -115,6 +115,25 @@ header h1 {
     background: #5a67d8;
 }
 
+#prev10Btn, #next10Btn {
+    background: #805ad5;
+    font-weight: bold;
+    min-width: 50px;
+}
+
+#prev10Btn:hover:not(:disabled), #next10Btn:hover:not(:disabled) {
+    background: #6b46c1;
+}
+
+#startBtn, #endBtn {
+    background: #9f7aea;
+    font-size: 16px;
+}
+
+#startBtn:hover:not(:disabled), #endBtn:hover:not(:disabled) {
+    background: #805ad5;
+}
+
 #playBtn {
     background: #48bb78;
 }
@@ -236,8 +255,15 @@ canvas {
 }
 
 .node-hexagon.path-node {
-    filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.6));
     animation: nodePulse 1.5s infinite;
+}
+
+.node-hexagon.search-path {
+    filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.6));
+}
+
+.node-hexagon.ping-path {
+    filter: drop-shadow(0 0 10px rgba(0, 255, 0, 0.6));
 }
 
 @keyframes nodePulse {
@@ -256,8 +282,15 @@ canvas {
 
 .link.highlighted-edge {
     opacity: 1;
-    filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.8));
     animation: pulse 1.5s infinite;
+}
+
+.link.search-edge {
+    filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.8));
+}
+
+.link.ping-edge {
+    filter: drop-shadow(0 0 8px rgba(0, 255, 0, 0.8));
 }
 
 @keyframes pulse {

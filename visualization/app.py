@@ -22,6 +22,251 @@ auto_generation_thread = None
 auto_generation_stop = Event()
 current_graph = {'nodes': [], 'edges': []}
 explored_paths = set()
+incremental_graph_state = {'nodes': {}, 'edges': {}}  # Track discovered nodes and edges across calls
+
+def convert_incremental_format(data):
+    """Convert single-node incremental format (test3.jsonl) to visualization format"""
+    global incremental_graph_state
+    
+    current_node = data.get('graphAfter', {})
+    query = data.get('query', '')
+    result = data.get('result', [])
+    is_ping = data.get('isPingQuery', False)
+    
+    # Extract clean query without brackets
+    clean_query = ''.join(c for c in query if c.isdigit())
+    
+    # Map numeric labels to A,B,C,D
+    label_map = {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
+    
+    # Update the current node info
+    node_id = str(current_node.get('nodeId', 0))
+    incremental_graph_state['nodes'][node_id] = {
+        'id': 'START' if current_node.get('roomIndex') == 0 else node_id,
+        'nodeId': node_id,
+        'label': label_map.get(current_node.get('roomLabel', 0), 'A'),
+        'roomIndex': current_node.get('roomIndex')
+    }
+    
+    # Process doors from current node to build edges
+    doors = current_node.get('doors', [])
+    for door_num, target_node_id in enumerate(doors):
+        if target_node_id is not None:
+            target_id = str(target_node_id)
+            source = 'START' if node_id == '0' and current_node.get('roomIndex') == 0 else node_id
+            
+            # Add target node if not exists (will be updated when we visit it)
+            if target_id not in incremental_graph_state['nodes']:
+                incremental_graph_state['nodes'][target_id] = {
+                    'id': target_id,
+                    'nodeId': target_id,
+                    'label': 'A'  # Default, will be updated when visited
+                }
+            
+            # Add/update edge
+            edge_key = f"{source}_{door_num}"
+            incremental_graph_state['edges'][edge_key] = {
+                'source': source,
+                'target': target_id if target_id != '0' or not incremental_graph_state['nodes'].get(target_id, {}).get('roomIndex') == 0 else 'START',
+                'door': door_num
+            }
+    
+    # Build the path from query and result for visualization
+    path_nodes = set()
+    path_edges = set()
+    
+    if result and clean_query:
+        current_pos = 'START' if node_id == '0' and current_node.get('roomIndex') == 0 else node_id
+        path_nodes.add(current_pos)
+        
+        for i, door_char in enumerate(clean_query):
+            if i < len(result):
+                door_num = int(door_char)
+                # Find where this door leads from current position
+                edge_key = f"{current_pos}_{door_num}"
+                if edge_key in incremental_graph_state['edges']:
+                    edge = incremental_graph_state['edges'][edge_key]
+                    next_pos = edge['target']
+                    path_nodes.add(next_pos)
+                    path_edges.add(f"{current_pos}-{next_pos}-{door_num}")
+                    current_pos = next_pos
+    
+    # Convert to visualization format
+    nodes = list(incremental_graph_state['nodes'].values())
+    edges = list(incremental_graph_state['edges'].values())
+    
+    return {
+        'timestamp': datetime.now().isoformat(),
+        'iterationnumber': data.get('iterationnumber', 0),
+        'current_querypath': clean_query if not is_ping else '',
+        'ping_path': clean_query if is_ping else '',
+        'search_path': clean_query if not is_ping else '',
+        'isPingQuery': is_ping,
+        'current_graph': {
+            'nodes': nodes,
+            'edges': edges
+        },
+        'path_nodes': list(path_nodes),  # For highlighting
+        'path_edges': list(path_edges),  # For highlighting
+        'graphBefore': data.get('graphBefore')
+    }
+
+def convert_node_format(data):
+    """Convert node-based format to visualization format"""
+    # Get graphAfter which contains the current state
+    graph_after = data.get('graphAfter', [])
+    
+    # For test2.jsonl format - single node object (incremental)
+    if isinstance(graph_after, dict):
+        # Single node format - need to build graph from exploration
+        return convert_incremental_format(data)
+    
+    # For test_nodes2.jsonl format - array of all nodes
+    
+    query = data.get('query', '')
+    result = data.get('result', [])
+    is_ping = data.get('isPingQuery', False)
+    
+    # Extract clean query without brackets
+    clean_query = ''.join(c for c in query if c.isdigit())
+    
+    # Map numeric labels to A,B,C,D
+    label_map = {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
+    
+    # Build nodes from graphAfter
+    nodes = []
+    node_map = {}
+    
+    for node_data in graph_after:
+        node_id = str(node_data['nodeId'])
+        room_label = label_map.get(node_data.get('roomLabel', 0), 'A')
+        
+        node = {
+            'id': node_id,
+            'label': room_label,
+            'nodeId': node_id  # Always include nodeId for display
+        }
+        
+        # Add roomIndex if present (marks special nodes)
+        if 'roomIndex' in node_data:
+            node['roomIndex'] = node_data['roomIndex']
+            # Special handling for START node
+            if node_data['roomIndex'] == 0:
+                node['id'] = 'START'
+                node['nodeId'] = node_id
+        
+        nodes.append(node)
+        node_map[node_id] = node
+    
+    # Build edges from doors arrays
+    edges = []
+    for node_data in graph_after:
+        source_id = str(node_data['nodeId'])
+        source_node = node_map.get(source_id)
+        
+        # Use START for roomIndex 0
+        if source_node and source_node.get('id') == 'START':
+            source_id = 'START'
+        
+        doors = node_data.get('doors', [])
+        for door_num, target_node_id in enumerate(doors):
+            if target_node_id is not None:
+                target_id = str(target_node_id)
+                target_node = node_map.get(target_id)
+                
+                # Use START for roomIndex 0
+                if target_node and target_node.get('id') == 'START':
+                    target_id = 'START'
+                
+                edges.append({
+                    'source': source_id,
+                    'target': target_id,
+                    'door': door_num
+                })
+    
+    # Create visualization state with both ping and search paths
+    viz_state = {
+        'timestamp': datetime.now().isoformat(),
+        'iterationnumber': data.get('iterationnumber', 0),
+        'current_querypath': clean_query if not is_ping else '',  # Regular query path
+        'ping_path': clean_query if is_ping else '',  # Ping path (green)
+        'search_path': clean_query if not is_ping else '',  # Search/exploration path (red)
+        'isPingQuery': is_ping,
+        'current_graph': {
+            'nodes': nodes,
+            'edges': edges
+        }
+    }
+    
+    # Include graphBefore info if present
+    if 'graphBefore' in data:
+        viz_state['graphBefore'] = data['graphBefore']
+    
+    return viz_state
+
+def convert_exploration_format(exploration_data):
+    """Convert exploration format to visualization format"""
+    # Check if this is the new node format with graphAfter
+    if 'graphAfter' in exploration_data:
+        return convert_node_format(exploration_data)
+    
+    # Extract query without brackets
+    query = exploration_data.get('query', '')
+    clean_query = ''.join(c for c in query if c.isdigit())
+    
+    # Get result labels
+    result = exploration_data.get('result', [])
+    
+    # Build graph from query and results
+    nodes = [{'id': 'START', 'label': result[0] if result else 0}]
+    edges = []
+    node_map = {'START': nodes[0]}
+    
+    current_path = ''
+    current_node_id = 'START'
+    
+    for i, door in enumerate(clean_query):
+        current_path += door
+        door_num = int(door)
+        
+        # Check if we already have an edge from current node with this door
+        existing_edge = None
+        for edge in edges:
+            if edge['source'] == current_node_id and edge['door'] == door_num:
+                existing_edge = edge
+                current_node_id = edge['target']
+                break
+        
+        if not existing_edge and i + 1 < len(result):
+            # Create new node if needed
+            new_node_id = current_path
+            if new_node_id not in node_map:
+                # Map numeric labels to A,B,C,D
+                label_map = {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
+                label = label_map.get(result[i + 1], 'A')
+                
+                new_node = {'id': new_node_id, 'label': label}
+                nodes.append(new_node)
+                node_map[new_node_id] = new_node
+            
+            # Add edge
+            edges.append({
+                'source': current_node_id,
+                'target': new_node_id,
+                'door': door_num
+            })
+            current_node_id = new_node_id
+    
+    # Create visualization state
+    return {
+        'timestamp': datetime.now().isoformat(),
+        'iterationnumber': exploration_data.get('iterationnumber', 0),
+        'current_querypath': clean_query,
+        'current_graph': {
+            'nodes': nodes,
+            'edges': edges
+        }
+    }
 
 def read_jsonl_file(filepath, from_position=0):
     """Read JSONL file from a specific position"""
@@ -33,12 +278,21 @@ def read_jsonl_file(filepath, from_position=0):
             # Seek to last position
             f.seek(from_position)
             
+            line_num = 0
             for line in f:
                 line = line.strip()
                 if line:
                     try:
                         state = json.loads(line)
+                        
+                        # Check if this is exploration format or visualization format
+                        if 'query' in state and 'result' in state:
+                            # Convert exploration format to visualization format
+                            state = convert_exploration_format(state)
+                            state['iterationnumber'] = line_num
+                        
                         states.append(state)
+                        line_num += 1
                     except json.JSONDecodeError as e:
                         print(f"Error parsing line: {e}")
             
@@ -52,7 +306,10 @@ def read_jsonl_file(filepath, from_position=0):
 
 def load_all_states(filepath='graph_states.jsonl'):
     """Load all states from JSONL file"""
-    global graph_states, last_position, file_path
+    global graph_states, last_position, file_path, incremental_graph_state
+    
+    # Reset incremental graph state for new file
+    incremental_graph_state = {'nodes': {}, 'edges': {}}
     
     file_path = filepath
     with states_lock:
@@ -200,18 +457,32 @@ def load_data():
     
     try:
         graph_states = []
+        line_num = 0
         
         if format_type == 'json':
             # Parse as JSON array
             states_list = json.loads(content)
-            graph_states.extend(states_list)
+            for state in states_list:
+                # Check if conversion needed
+                if 'query' in state and 'result' in state:
+                    state = convert_exploration_format(state)
+                    state['iterationnumber'] = line_num
+                graph_states.append(state)
+                line_num += 1
         else:
             # Parse as JSONL
             for line in content.strip().split('\n'):
                 if line.strip():
                     try:
                         state = json.loads(line)
+                        
+                        # Check if this is exploration format
+                        if 'query' in state and 'result' in state:
+                            state = convert_exploration_format(state)
+                            state['iterationnumber'] = line_num
+                        
                         graph_states.append(state)
+                        line_num += 1
                     except json.JSONDecodeError:
                         continue
         

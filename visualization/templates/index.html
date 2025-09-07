@@ -36,14 +36,26 @@
         </header>
 
         <div class="controls">
-            <button id="prevBtn" onclick="previousState()" disabled>
+            <button id="startBtn" onclick="jumpToStart()" title="Jump to Start (Home)">
+                ⏮️
+            </button>
+            <button id="prev10Btn" onclick="skipStates(-10)" title="Back 10 steps (Page Up)">
+                -10
+            </button>
+            <button id="prevBtn" onclick="previousState()" disabled title="Previous (Left Arrow)">
                 ← Previous
             </button>
             <div class="state-indicator">
                 <span id="currentState">0</span> / <span id="totalStates">0</span>
             </div>
-            <button id="nextBtn" onclick="nextState()" disabled>
+            <button id="nextBtn" onclick="nextState()" disabled title="Next (Right Arrow)">
                 Next →
+            </button>
+            <button id="next10Btn" onclick="skipStates(10)" title="Forward 10 steps (Page Down)">
+                +10
+            </button>
+            <button id="endBtn" onclick="jumpToEnd()" title="Jump to End (End)">
+                ⏭️
             </button>
             <div class="separator"></div>
             <button id="playBtn" onclick="togglePlay()">

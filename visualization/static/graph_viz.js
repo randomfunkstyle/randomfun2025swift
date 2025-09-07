@@ -33,8 +33,8 @@ const labelColors = {
 };
 
 // Helper function to parse query path and identify which edges and nodes to highlight
-function parseQueryPath(queryPath, edges) {
-    if (!queryPath) return { pathEdges: new Set(), pathNodes: new Set() };
+function parseQueryPath(queryPath, edges, pathType = 'search') {
+    if (!queryPath) return { pathEdges: new Set(), pathNodes: new Set(), pathType };
     
     const pathEdges = new Set();
     const pathNodes = new Set();
@@ -64,7 +64,7 @@ function parseQueryPath(queryPath, edges) {
         }
     }
     
-    return { pathEdges, pathNodes };
+    return { pathEdges, pathNodes, pathType };
 }
 
 // Initialize the visualization
@@ -176,12 +176,28 @@ function displayState(index) {
     // Update info panel
     document.getElementById('timestamp').textContent = state.timestamp || '-';
     document.getElementById('iteration').textContent = state.iterationnumber || '0';
-    document.getElementById('querypath').textContent = state.current_querypath || '-';
+    
+    // Show both ping and search paths
+    let pathDisplay = '';
+    if (state.ping_path) {
+        pathDisplay += `🟢 Ping: ${state.ping_path} `;
+    }
+    if (state.search_path) {
+        pathDisplay += `🔴 Search: ${state.search_path}`;
+    }
+    if (!pathDisplay && state.current_querypath) {
+        pathDisplay = state.current_querypath;
+    }
+    document.getElementById('querypath').textContent = pathDisplay || '-';
     document.getElementById('currentState').textContent = index + 1;
     
     // Update navigation buttons
     document.getElementById('prevBtn').disabled = index === 0;
     document.getElementById('nextBtn').disabled = index === states.length - 1;
+    document.getElementById('prev10Btn').disabled = index === 0;
+    document.getElementById('next10Btn').disabled = index === states.length - 1;
+    document.getElementById('startBtn').disabled = index === 0;
+    document.getElementById('endBtn').disabled = index === states.length - 1;
     
     // Draw the graph
     drawGraph(state.current_graph);
@@ -264,9 +280,26 @@ function renderCanvas() {
     const showClusters = currentZoom < 0.05 && currentNodes.length > 1000;
     const nodeRadius = Math.max(2, Math.min(30, 30 * currentZoom));
     
-    // Parse query path for highlighting
-    const queryPath = states[currentStateIndex]?.current_querypath || '';
-    const { pathEdges, pathNodes } = parseQueryPath(queryPath, currentEdges);
+    // Parse both ping and search paths for highlighting
+    const state = states[currentStateIndex] || {};
+    const searchPath = state.search_path || state.current_querypath || '';
+    const pingPath = state.ping_path || '';
+    
+    // Parse both paths
+    const searchPathData = parseQueryPath(searchPath, currentEdges, 'search');
+    const pingPathData = parseQueryPath(pingPath, currentEdges, 'ping');
+    
+    // Combine path data (ping takes precedence for coloring)
+    const pathEdges = new Map();
+    const pathNodes = new Map();
+    
+    // Add search paths (red)
+    searchPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'search'));
+    searchPathData.pathNodes.forEach(node => pathNodes.set(node, 'search'));
+    
+    // Add ping paths (green) - these override search if there's overlap
+    pingPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'ping'));
+    pingPathData.pathNodes.forEach(node => pathNodes.set(node, 'ping'));
     
     // If extremely zoomed out with many nodes, show clusters
     if (showClusters) {
@@ -305,11 +338,15 @@ function renderCanvas() {
                     
                     // Check if this edge is in the path
                     const edgeKey = `${edge.source.id || edge.source}-${edge.target.id || edge.target}-${edge.door}`;
-                    const isPathEdge = pathEdges.has(edgeKey);
+                    const pathType = pathEdges.get(edgeKey);
+                    const isPathEdge = !!pathType;
                     
-                    // Style based on whether it's a path edge
-                    if (isPathEdge) {
-                        context.strokeStyle = '#ff4444';
+                    // Style based on path type
+                    if (pathType === 'ping') {
+                        context.strokeStyle = '#00ff00';  // Green for ping
+                        context.lineWidth = Math.max(2, 4 / currentZoom);
+                    } else if (pathType === 'search') {
+                        context.strokeStyle = '#ff4444';  // Red for search
                         context.lineWidth = Math.max(2, 4 / currentZoom);
                     } else {
                         context.strokeStyle = 'rgba(153, 153, 153, 0.3)';
@@ -338,7 +375,8 @@ function renderCanvas() {
         visibleNodeCount++;
         
         // Check if this node is in the path
-        const isPathNode = pathNodes.has(node.id);
+        const pathType = pathNodes.get(node.id);
+        const isPathNode = !!pathType;
         
         // Use constant size for path nodes
         const actualRadius = isPathNode ? 20 / currentZoom : nodeRadius;
@@ -349,16 +387,27 @@ function renderCanvas() {
         context.arc(node.x, node.y, actualRadius, 0, 2 * Math.PI);
         context.fill();
         
-        // Draw border (thicker for path nodes)
-        context.strokeStyle = isPathNode ? '#ff0000' : '#333';
+        // Draw border (color based on path type)
+        if (pathType === 'ping') {
+            context.strokeStyle = '#00ff00';  // Green for ping
+        } else if (pathType === 'search') {
+            context.strokeStyle = '#ff0000';  // Red for search
+        } else {
+            context.strokeStyle = '#333';
+        }
         context.lineWidth = isPathNode ? 4 / currentZoom : Math.max(0.5, 2 * currentZoom);
         context.stroke();
         
         // Add glow effect for path nodes
         if (isPathNode) {
-            context.shadowColor = 'rgba(255, 0, 0, 0.6)';
+            if (pathType === 'ping') {
+                context.shadowColor = 'rgba(0, 255, 0, 0.6)';
+                context.strokeStyle = '#00ff00';
+            } else {
+                context.shadowColor = 'rgba(255, 0, 0, 0.6)';
+                context.strokeStyle = '#ff0000';
+            }
             context.shadowBlur = 10 / currentZoom;
-            context.strokeStyle = '#ff0000';
             context.lineWidth = 2 / currentZoom;
             context.stroke();
             context.shadowBlur = 0;
@@ -383,9 +432,26 @@ function renderCanvas() {
 function updateLevelOfDetail() {
     if (useCanvas) return; // Canvas handles its own LOD
     
-    // Parse query path for highlighting
-    const queryPath = states[currentStateIndex]?.current_querypath || '';
-    const { pathEdges, pathNodes } = parseQueryPath(queryPath, currentEdges);
+    // Parse both ping and search paths for highlighting
+    const state = states[currentStateIndex] || {};
+    const searchPath = state.search_path || state.current_querypath || '';
+    const pingPath = state.ping_path || '';
+    
+    // Parse both paths
+    const searchPathData = parseQueryPath(searchPath, currentEdges, 'search');
+    const pingPathData = parseQueryPath(pingPath, currentEdges, 'ping');
+    
+    // Combine path data (ping takes precedence for coloring)
+    const pathEdges = new Map();
+    const pathNodes = new Map();
+    
+    // Add search paths (red)
+    searchPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'search'));
+    searchPathData.pathNodes.forEach(node => pathNodes.set(node, 'search'));
+    
+    // Add ping paths (green) - these override search if there's overlap
+    pingPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'ping'));
+    pingPathData.pathNodes.forEach(node => pathNodes.set(node, 'ping'));
     
     // Update SVG elements based on zoom level
     const showLabels = currentZoom > 0.3;
@@ -406,7 +472,7 @@ function updateLevelOfDetail() {
     // Adjust node size based on zoom - but keep path nodes constant size
     nodeGroup.selectAll('path')
         .attr('d', d => {
-            if (pathNodes.has(d.id)) {
+            if (pathNodes.get(d.id)) {
                 // Path nodes stay constant visual size
                 return hexagonPath(20 / currentZoom);
             } else {
@@ -437,7 +503,7 @@ function updateLevelOfDetail() {
         })
         .attr('opacity', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 1 : (currentZoom < 0.3 ? 0.3 : 0.6);
+            return pathEdges.get(edgeKey) ? 1 : (currentZoom < 0.3 ? 0.3 : 0.6);
         });
 }
 
@@ -509,9 +575,26 @@ function drawGraph(graphData) {
     document.getElementById('nodecount').textContent = nodes.length;
     document.getElementById('edgecount').textContent = edges.length;
     
-    // Parse the query path to highlight edges and nodes
-    const queryPath = states[currentStateIndex].current_querypath || '';
-    const { pathEdges, pathNodes } = parseQueryPath(queryPath, edges);
+    // Parse both ping and search paths to highlight edges and nodes
+    const state = states[currentStateIndex];
+    const searchPath = state.search_path || state.current_querypath || '';
+    const pingPath = state.ping_path || '';
+    
+    // Parse both paths
+    const searchPathData = parseQueryPath(searchPath, edges, 'search');
+    const pingPathData = parseQueryPath(pingPath, edges, 'ping');
+    
+    // Combine path data (ping takes precedence for coloring)
+    const pathEdges = new Map();
+    const pathNodes = new Map();
+    
+    // Add search paths (red)
+    searchPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'search'));
+    searchPathData.pathNodes.forEach(node => pathNodes.set(node, 'search'));
+    
+    // Add ping paths (green) - these override search if there's overlap
+    pingPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'ping'));
+    pingPathData.pathNodes.forEach(node => pathNodes.set(node, 'ping'));
     
     // Create or update force simulation
     if (!simulation || isInitialDraw) {
@@ -546,15 +629,18 @@ function drawGraph(graphData) {
     const linkLine = linkEnter.append('line')
         .attr('class', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 'link highlighted-edge' : 'link';
+            return pathEdges.get(edgeKey) ? 'link highlighted-edge' : 'link';
         })
         .attr('stroke', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? '#ff4444' : '#999';
+            const pathType = pathEdges.get(edgeKey);
+            if (pathType === 'ping') return '#00ff00';  // Green for ping
+            if (pathType === 'search') return '#ff4444';  // Red for search
+            return '#999';  // Default gray
         })
         .attr('stroke-width', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 4 : 2;
+            return pathEdges.get(edgeKey) ? 4 : 2;
         })
         .attr('marker-end', 'url(#arrowhead)');
     
@@ -562,20 +648,20 @@ function drawGraph(graphData) {
     const linkLabel = linkEnter.append('text')
         .attr('class', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 'link-label highlighted-label' : 'link-label';
+            return pathEdges.get(edgeKey) ? 'link-label highlighted-label' : 'link-label';
         })
         .text(d => d.door !== undefined ? d.door : '')
         .attr('font-size', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? '16px' : '12px';
+            return pathEdges.get(edgeKey) ? '16px' : '12px';
         })
         .attr('font-weight', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 'bold' : 'normal';
+            return pathEdges.get(edgeKey) ? 'bold' : 'normal';
         })
         .attr('fill', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? '#ff0000' : '#666';
+            return pathEdges.get(edgeKey) ? '#ff0000' : '#666';
         })
         .attr('text-anchor', 'middle');
     
@@ -598,14 +684,32 @@ function drawGraph(graphData) {
     nodeEnter.append('path')
         .attr('d', hexagonPath(30))
         .attr('fill', d => labelColors[d.label] || '#ccc')
-        .attr('stroke', d => pathNodes.has(d.id) ? '#ff0000' : '#333')
-        .attr('stroke-width', d => pathNodes.has(d.id) ? 4 : 2)
-        .attr('class', d => pathNodes.has(d.id) ? 'node-hexagon path-node' : 'node-hexagon');
+        .attr('stroke', d => {
+            // Purple for special nodes with roomIndex
+            if (d.roomIndex !== undefined && d.roomIndex !== null) return '#9f7aea';
+            // Path coloring based on type
+            const pathType = pathNodes.get(d.id);
+            if (pathType === 'ping') return '#00ff00';  // Green for ping
+            if (pathType === 'search') return '#ff0000';  // Red for search
+            // Default
+            return '#333';
+        })
+        .attr('stroke-width', d => {
+            if (d.roomIndex !== undefined && d.roomIndex !== null) return 3;
+            if (pathNodes.has(d.id) || pathNodes.get(d.id)) return 4;
+            return 2;
+        })
+        .attr('class', d => {
+            if (d.roomIndex !== undefined && d.roomIndex !== null) return 'node-hexagon special-node';
+            const pathType = pathNodes.get(d.id);
+            if (pathType) return `node-hexagon path-node ${pathType}-path`;
+            return 'node-hexagon';
+        });
     
-    // Node labels (room ID)
+    // Node labels (show nodeId if available, otherwise ID)
     nodeEnter.append('text')
         .attr('class', 'node-id')
-        .text(d => d.id)
+        .text(d => d.nodeId || d.id)
         .attr('text-anchor', 'middle')
         .attr('dy', '-5')
         .attr('font-size', '14px')
@@ -619,6 +723,16 @@ function drawGraph(graphData) {
         .attr('dy', '10')
         .attr('font-size', '16px')
         .attr('fill', '#333');
+    
+    // Room index indicator for special nodes
+    nodeEnter.append('text')
+        .attr('class', 'node-room-index')
+        .attr('text-anchor', 'middle')
+        .attr('dy', '30')
+        .attr('font-size', '12px')
+        .attr('font-weight', 'bold')
+        .attr('fill', '#9f7aea')
+        .text(d => d.roomIndex !== undefined && d.roomIndex !== null ? `[${d.roomIndex}]` : '');
     
     // Merge enter and update selections
     const allLinks = linkGroup.selectAll('g.link-group');
@@ -652,56 +766,86 @@ function drawGraph(graphData) {
 }
 
 function updateHighlighting() {
-    // Parse the query path to highlight edges and nodes
-    const queryPath = states[currentStateIndex]?.current_querypath || '';
-    const { pathEdges, pathNodes } = parseQueryPath(queryPath, currentEdges);
+    // Parse both ping and search paths to highlight edges and nodes
+    const state = states[currentStateIndex] || {};
+    const searchPath = state.search_path || state.current_querypath || '';
+    const pingPath = state.ping_path || '';
+    
+    // Parse both paths
+    const searchPathData = parseQueryPath(searchPath, currentEdges, 'search');
+    const pingPathData = parseQueryPath(pingPath, currentEdges, 'ping');
+    
+    // Combine path data (ping takes precedence for coloring)
+    const pathEdges = new Map();
+    const pathNodes = new Map();
+    
+    // Add search paths (red)
+    searchPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'search'));
+    searchPathData.pathNodes.forEach(node => pathNodes.set(node, 'search'));
+    
+    // Add ping paths (green) - these override search if there's overlap
+    pingPathData.pathEdges.forEach(edge => pathEdges.set(edge, 'ping'));
+    pingPathData.pathNodes.forEach(node => pathNodes.set(node, 'ping'));
     
     // Update edge highlighting
     linkGroup.selectAll('line')
         .attr('class', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 'link highlighted-edge' : 'link';
+            const pathType = pathEdges.get(edgeKey);
+            return pathType ? `link highlighted-edge ${pathType}-edge` : 'link';
         })
         .attr('stroke', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? '#ff4444' : '#999';
+            const pathType = pathEdges.get(edgeKey);
+            if (pathType === 'ping') return '#00ff00';  // Green for ping
+            if (pathType === 'search') return '#ff4444';  // Red for search
+            return '#999';  // Default gray
         })
         .attr('stroke-width', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 4 : 2;
+            return pathEdges.get(edgeKey) ? 4 : 2;
         });
     
     // Update edge label highlighting
     linkGroup.selectAll('text')
         .attr('class', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 'link-label highlighted-label' : 'link-label';
+            return pathEdges.get(edgeKey) ? 'link-label highlighted-label' : 'link-label';
         })
         .attr('font-size', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? '16px' : '12px';
+            return pathEdges.get(edgeKey) ? '16px' : '12px';
         })
         .attr('font-weight', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? 'bold' : 'normal';
+            return pathEdges.get(edgeKey) ? 'bold' : 'normal';
         })
         .attr('fill', d => {
             const edgeKey = `${d.source.id || d.source}-${d.target.id || d.target}-${d.door}`;
-            return pathEdges.has(edgeKey) ? '#ff0000' : '#666';
+            return pathEdges.get(edgeKey) ? '#ff0000' : '#666';
         });
     
     // Update node highlighting with constant visual stroke width for path nodes
     nodeGroup.selectAll('path')
-        .attr('stroke', d => pathNodes.has(d.id) ? '#ff0000' : '#333')
+        .attr('stroke', d => {
+            const pathType = pathNodes.get(d.id);
+            if (pathType === 'ping') return '#00ff00';  // Green for ping
+            if (pathType === 'search') return '#ff0000';  // Red for search
+            return '#333';  // Default
+        })
         .attr('stroke-width', d => {
-            if (pathNodes.has(d.id)) {
+            if (pathNodes.get(d.id)) {
                 // Path nodes have constant visual stroke width
                 return 4 / currentZoom;
             } else {
                 return 2;
             }
         })
-        .attr('class', d => pathNodes.has(d.id) ? 'node-hexagon path-node' : 'node-hexagon');
+        .attr('class', d => {
+            const pathType = pathNodes.get(d.id);
+            if (pathType) return `node-hexagon path-node ${pathType}-path`;
+            return 'node-hexagon';
+        });
 }
 
 function hexagonPath(radius) {
@@ -740,6 +884,29 @@ function previousState() {
 function nextState() {
     if (currentStateIndex < states.length - 1) {
         displayState(currentStateIndex + 1);
+    }
+}
+
+function skipStates(delta) {
+    const newIndex = currentStateIndex + delta;
+    if (newIndex >= 0 && newIndex < states.length) {
+        displayState(newIndex);
+    } else if (newIndex < 0) {
+        displayState(0);
+    } else if (newIndex >= states.length) {
+        displayState(states.length - 1);
+    }
+}
+
+function jumpToStart() {
+    if (states.length > 0) {
+        displayState(0);
+    }
+}
+
+function jumpToEnd() {
+    if (states.length > 0) {
+        displayState(states.length - 1);
     }
 }
 
@@ -917,6 +1084,18 @@ document.addEventListener('keydown', function(e) {
     } else if (e.key === ' ') {
         e.preventDefault();
         togglePlay();
+    } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        skipStates(-10);
+    } else if (e.key === 'PageDown') {
+        e.preventDefault();
+        skipStates(10);
+    } else if (e.key === 'Home') {
+        e.preventDefault();
+        jumpToStart();
+    } else if (e.key === 'End') {
+        e.preventDefault();
+        jumpToEnd();
     }
 });
 
