@@ -34,6 +34,10 @@ public class HTTPTaskClient {
         return try await post(endpoint: "/guess", body: request)
     }
 
+    public func score() async throws -> [String: Int] {
+        return try await get<[String: Int]>(endpoint: "/", queryParams: ["id": self.teamId])
+    }
+
     // MARK: - Private Helper Methods
     private func post<T: Codable, R: Codable>(endpoint: String, body: T) async throws -> R {
         let url = URL(string: "\(baseURL)\(endpoint)")!
@@ -52,7 +56,31 @@ public class HTTPTaskClient {
             throw HTTPError(
                 statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
                 message: String(data: data, encoding: .utf8) ?? "Unknown error"
-        )
+            )
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(R.self, from: data)
+    }
+
+    private func get<R: Codable>(endpoint: String, queryParams: [String: String]) async throws -> R
+    {
+        var urlComponents = URLComponents(string: "\(baseURL)\(endpoint)")!
+        urlComponents.queryItems = queryParams.map { URLQueryItem(name: $0.key, value: $0.value) }
+
+        let url = urlComponents.url!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw HTTPError(
+                statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                message: String(data: data, encoding: .utf8) ?? "Unknown error"
+            )
         }
 
         let decoder = JSONDecoder()

@@ -364,6 +364,10 @@ public class MockExplorationClient: ExplorationClient {
         }
         return true
     }
+
+    public func score(problemName: String) async throws -> Int {
+        return Int.max
+    }
 }
 
 /// Mock client that always fails - for testing error handling
@@ -379,6 +383,10 @@ class MockFailingClient: ExplorationClient {
 
     /// Always throws an error
     func submitGuess(map: MapDescription) async throws -> GuessResponse {
+        throw URLError(.badServerResponse)
+    }
+
+    func score(problemName: String) async throws -> Int {
         throw URLError(.badServerResponse)
     }
 }
@@ -397,5 +405,9 @@ class MockEmptyClient: ExplorationClient {
     /// Always returns incorrect
     func submitGuess(map: MapDescription) async throws -> GuessResponse {
         return GuessResponse(correct: false)
+    }
+
+    func score(problemName: String) async throws -> Int {
+        return Int.max
     }
 }

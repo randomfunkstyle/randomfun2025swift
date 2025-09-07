@@ -11,18 +11,20 @@ public protocol ExplorationClient {
     /// - Parameter plans: Array of path strings (e.g., ["012", "345"])
     /// - Returns: ExploreResponse containing room labels for each path
     func explore(plans: [String]) async throws -> ExploreResponse
-    
+
     /// Submit a final map guess to verify if it's correct
     /// - Parameter map: Complete map description with rooms and connections
     /// - Returns: GuessResponse indicating if the map is correct
     func submitGuess(map: MapDescription) async throws -> GuessResponse
+
+    func score(problemName: String) async throws -> Int
 }
 
 /// Concrete implementation of ExplorationClient using HTTP
 /// Wraps the HTTPTaskClient to provide the ExplorationClient interface
 public class HTTPExplorationClient: ExplorationClient {
     private let httpClient: HTTPTaskClient
-    
+
     /// Initialize with team ID and HTTP client
     /// - Parameters:
     ///   - teamId: Team identifier for the contest
@@ -39,9 +41,13 @@ public class HTTPExplorationClient: ExplorationClient {
     public func explore(plans: [String]) async throws -> ExploreResponse {
         return try await httpClient.explore(plans: plans)
     }
-    
+
     /// Forward map guess to HTTP client
     public func submitGuess(map: MapDescription) async throws -> GuessResponse {
         return try await httpClient.guess(map: map)
+    }
+
+    public func score(problemName: String) async throws -> Int {
+        return try await httpClient.score()[problemName] ?? 0
     }
 }
