@@ -231,7 +231,7 @@ class KnownState {
             } else {
                 // This is a new unique room found (The last room)
                 logKnownState("[2]Found LAST? unique room: \(room.label) \(room.path)")
-                room.potential = Set([foundUniqueRooms])
+                room.potential = [foundUniqueRooms]
                 foundUniqueRooms += 1
                 definedRooms[room.index!] = room
                 logKnownState("Added unique room: with \(room.index!)")
@@ -307,7 +307,7 @@ class KnownState {
             guard room.potential.contains(definedRoomIndex) else { continue }
 
             if isDifferent(room: room, definedRoom: definedRoom, depth: depth) {
-                room.potential.remove(definedRoomIndex)
+                room.potential.removeAll(where: { $0 == definedRoomIndex })
                 continue
             }
         }
@@ -405,7 +405,7 @@ class KnownState {
 
             // This is a new unique room found
             logKnownState("[3]Found new unique room: \(room.label) \(room.path)")
-            room.potential = Set([foundUniqueRooms])  // 0
+            room.potential = [foundUniqueRooms]  // 0
             foundUniqueRooms += 1
             definedRooms[room.index!] = room
             logKnownState("Added unique room: with \(room.index!)")
@@ -425,7 +425,7 @@ class KnownState {
         if room.potential.count <= totalRoomsCount - foundUniqueRooms {
             // This is a new unique room found
             logKnownState("[1]Found new unique room: \(room.label) \(room.path)")
-            room.potential = Set([foundUniqueRooms])  // 0
+            room.potential = [foundUniqueRooms]  // 0
             foundUniqueRooms += 1
             definedRooms[room.index!] = room
             logKnownState("Added unique room: with \(room.index!)")

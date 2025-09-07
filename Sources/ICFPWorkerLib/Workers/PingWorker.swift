@@ -251,7 +251,7 @@ public final class PingWorker: Worker {
                 guard let charcoaledRoomIndex = charcoaledRoom.index else {
                     fatalError("Charcoaled room \(charcoaledRoom) has no index")
                 }
-                destinationRoom.potential.remove(charcoaledRoomIndex)
+                destinationRoom.potential.removeAll(where: { $0 == charcoaledRoomIndex})
 
                 print(
                     "🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at laest we removed one potential \(charcoaledRoomIndex)"

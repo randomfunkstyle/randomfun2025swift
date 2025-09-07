@@ -1,6 +1,12 @@
+extension Array where Element == Int {
+    func intersection(_ other: [Int]) -> [Int] {
+        return self.filter { other.contains($0) }
+    }
+}
+
 final class ExplorationRoom: CustomStringConvertible {
     // List of indexeses that this room potentially could be
-    var potential: Set<Int>
+    var potential: [Int]
 
     // 100% unique room index
     var index: Int? {
@@ -17,9 +23,9 @@ final class ExplorationRoom: CustomStringConvertible {
         self.label = label
         self.path = path
 
-        var potential = Set<Int>()
+        var potential = Array<Int>()
         for i in 0 ..< roomsCount {
-            potential.insert(i)
+            potential.append(i)
         }
         self.potential = potential
     }
