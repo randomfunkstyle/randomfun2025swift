@@ -124,8 +124,8 @@ public final class PingWorker: Worker {
         // Select one of pathsWithBoundRooms
         let sortedPotentialsWithoutKnown = sortPotentials.filter {
             knownState.path(to: $0.bound) != nil
-        }
-            .prefix(10)
+        }.shuffled()
+        .prefix(10)
         
         var pingQueries: [PingQuery] = []
         
