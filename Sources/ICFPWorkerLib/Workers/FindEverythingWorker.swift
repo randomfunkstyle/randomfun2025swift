@@ -299,6 +299,23 @@ public final class FindEverythingWorker: Worker {
         
         var isMagicNeeded: Bool = false
         
+        func printBoundRoomInfo() {
+            for room in definedRooms {
+                guard let room = room else { continue }
+                
+                var connectionsCount = 0
+                for r in (definedRooms.compactMap { $0}) {
+                    for door in r.doors {
+                        if door.destinationRoom?.index == room.index {
+                            connectionsCount += 1
+                        }
+                    }
+                }
+                
+                print("🍏 Bound [\(room.index!)] count: \(connectionsCount) / 6")
+            }
+        }
+        
         private func removeAllInvalidPotentialIndexes(_ room: ExplorationRoom) {
             for definedRoom in definedRooms {
                 guard let definedRoom = definedRoom else { continue }
@@ -399,6 +416,7 @@ public final class FindEverythingWorker: Worker {
         
         if uniqueRooms == problem.roomsCount && undefinedDoors == 0 {
             print("Everything is FINE 🔥")
+            knownState.printBoundRoomInfo()
             return false
         }
         
@@ -426,7 +444,7 @@ public final class FindEverythingWorker: Worker {
         
         for room in allInterestingRooms {
             
-            print("🍈 Found oor \(room) with unknown doors")
+            //            print("🍈 Found oor \(room) with unknown doors")
             if let door = room.doors.filter({ $0.destinationRoom == nil }).randomElement() {
                 print("🍈 Will explore door \(door.id) in room \(room)")
                 
@@ -471,10 +489,13 @@ public final class FindEverythingWorker: Worker {
         
         // 12-N
         
-        if let room = knownState.definedRooms.compactMap({ $0}).sorted(by: { $0.path.count < $1.path.count }).first(where:{ room in
+        knownState.printBoundRoomInfo()
+        
+        for room in knownState.definedRooms.compactMap({ $0}).sorted(by: { $0.path.count < $1.path.count }).filter({ room in
             room.doors.contains(where: { $0.destinationRoom == nil })
-        }) {
-            print("🍈 Found oor \(room) with unknown doors")
+        }).shuffled().prefix(15)
+        {
+            //            print("🍈 Found oor \(room) with unknown doors")
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
                 print("🍈 Will explore door \(door.id) in room \(room)")
                 
