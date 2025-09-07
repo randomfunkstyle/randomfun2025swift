@@ -16,24 +16,43 @@ public final class PingWorker: Worker {
         super.init(problem: problem, client: client)
     }
 
+    var maxIterations: Int = 5000
     override public func shouldContinue(iterations it: Int) -> Bool {
         // Let's count found unique rooms
         let uniqueRooms = knownState.foundUniqueRooms
         print("!!!Unique rooms found: \(uniqueRooms)/\(problem.roomsCount)")
 
-        let (definedDoors, undefinedDoors) = knownState.boundAndUnboundDoors()
+        let (definedDoors, undefinedDoors, zeroDoors) = knownState.boundAndUnboundDoors()
 
+        let totalDoors = problem.roomsCount * 6
+        let percentageOfDefinedDoors: Int = definedDoors * 100 / totalDoors
         if undefinedDoors != 0 {
-            print("😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors")
+            print("😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors of \(totalDoors) (\(percentageOfDefinedDoors)%)")
         }
 
-        if uniqueRooms == problem.roomsCount && undefinedDoors == 0 {
+        if uniqueRooms == problem.roomsCount && zeroDoors == 0 && undefinedDoors == 0 {
             print("Everything is FINE 🔥")
             knownState.printBoundRoomInfo()
             return false
         }
 
-        return it < 500
+        let istooLong = it > maxIterations
+        if istooLong {
+            print("Too many iterations \(it) 🔥 :(")
+            print("Continue? (y/n)")
+            
+            // Ask for input and to continue if possible
+            let response = readLine(strippingNewline: true)
+            if response?.lowercased() == "y" {
+                print("Continuing...")
+                maxIterations += 5000
+                return true
+            }
+            print("Stopping...")
+            return false
+        }
+            
+        return true
     }
 
     private var submittedQueries: [String] = []
@@ -281,25 +300,44 @@ public final class PingWorker: Worker {
         return submittedQueries
     }
 
+    private func printMermaidOnError() {
+        let mermaiMap = knownState.returnMermaidMap()
+        print("========================")
+        print(mermaiMap)
+        print("========================")
+    }
+
     override public func generateGuess() -> MapDescription {
         let allRooms = knownState.definedRooms.compactMap { $0 }
 
         for room in allRooms {
+
+            // We definetly know that all doors are connected somewher
             for door in room.doors {
-                if let destinationRoom = door.destinationRoom {
-                    if door.destinationDoor == nil {
-                        /// Connect somehow door
-                        ///
 
-                        // Find firs door that goes back
-                        let backDoor = destinationRoom.doors.first(where: {
-                            $0.destinationRoom === room && $0.destinationDoor == nil
-                        })!
 
-                        door.destinationDoor = backDoor
-                        backDoor.destinationDoor = door
-                    }
+                guard let destinationRoom = door.destinationRoom else{
+                    printMermaidOnError()
+                    fatalError("Door \(door.id) in room \(room) has no back door. How did we get there?")
                 }
+
+                guard door.destinationDoor != nil else {
+                    // We alread connected this door (not sure how, but still)
+                    continue
+                }
+
+                /// Connect somehow door
+
+                // Find firs door that goes back
+                guard let backDoor = destinationRoom.doors.first(where: {
+                    $0.destinationRoom!.index! == room.index! && $0.destinationDoor == nil
+                }) else {
+                    printMermaidOnError()
+                    fatalError("Door \(door.id) in room \(room) has no back door. How did we get there?")
+                }
+
+                door.destinationDoor = backDoor
+                backDoor.destinationDoor = door
             }
         }
 

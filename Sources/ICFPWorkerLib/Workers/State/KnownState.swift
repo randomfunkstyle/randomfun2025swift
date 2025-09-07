@@ -11,9 +11,33 @@ class KnownState {
         definedRooms = Array(repeating: nil, count: totalRoomsCount)
     }
 
-    func boundAndUnboundDoors() -> (definedDoors: Int, undefined: Int) {
+    func returnMermaidMap() -> String {
+        var mermaidMap = ""
+        mermaidMap += "graph G {\n"
+        for (index, room) in definedRooms.compactMap({ $0 }).enumerated() {
+            mermaidMap += "subgraph N\(index)[\"\(index)\"]\n"
+            for (doorIndex, door) in room.doors.enumerated() {
+                mermaidMap += "N\(index)\(doorIndex)[\"\(doorIndex)\"]\n"
+            }
+            mermaidMap += "end\n"
+        }
+
+        // Connections 
+        for (index, room) in definedRooms.compactMap({ $0 }).enumerated() {
+            for (doorIndex, door) in room.doors.enumerated() {
+                guard let destinationRoom = door.destinationRoom else { continue }
+                mermaidMap += "N\(index)\(doorIndex) -- N\(destinationRoom.index!)\(door.destinationDoor!.id)\n"
+            }
+        }
+
+        mermaidMap += "}"
+        return mermaidMap
+    }
+
+    func boundAndUnboundDoors() -> (definedDoors: Int, undefined: Int, zeroDoors: Int) {
         var undefinedDoors = 0
         var definedDoors = 0
+        var zeroDoors = 0
         for room in definedRooms {
             guard let room else { continue }
 
@@ -25,10 +49,12 @@ class KnownState {
                     } else {
                         definedDoors += 1
                     }
+                } else {
+                    zeroDoors += 1
                 }
             }
         }
-        return (definedDoors, undefinedDoors)
+        return (definedDoors, undefinedDoors, zeroDoors)
     }
 
     func moveByPathAndGetLabels(path: [Int]) -> [Int] {

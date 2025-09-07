@@ -21,13 +21,13 @@ public final class FindEverythingWorker: Worker {
         let uniqueRooms = knownState.foundUniqueRooms
         print("!!!Unique rooms found: \(uniqueRooms)/\(problem.roomsCount)")
 
-        let (definedDoors, undefinedDoors) = knownState.boundAndUnboundDoors()
+        let (definedDoors, undefinedDoors, zeroDoors) = knownState.boundAndUnboundDoors()
 
         if undefinedDoors != 0 {
             print("😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors")
         }
 
-        if uniqueRooms == problem.roomsCount && undefinedDoors == 0 {
+        if uniqueRooms == problem.roomsCount && zeroDoors == 0 && undefinedDoors == 0 {
             print("Everything is FINE 🔥")
             knownState.printBoundRoomInfo()
             return false
