@@ -64,20 +64,27 @@ struct CountLines: AsyncParsableCommand {
             case "Grid":
                 let problems: [Problem] = Problem.gridProblems()
 
-                for depth in (3...5).reversed() {
-                    for take in (5...10).reversed() {
-                         for p in problems {
-                            print("Running problem \(p.name) with depth \(depth) and take \(take)")
+                for depth in (5...6).reversed() {
+                    for take in (1...5).reversed() {
+                        for p in problems {
+
+                            let ttake = take * 3
+                            print("Running problem \(p.name) with depth \(depth) and take \(ttake)")
                             if #available(macOS 13.0, *) {
 
                                 for retry: Int in 1...5 {
-                                    if let res = try await PingWorker(
-                                        problem: p, client: HTTPExplorationClient(),
-                                        depth: depth,
-                                        take: take
-                                    ).run() {
-                                        print("Found solution with \(res)")
-                                        break
+                                    do {
+                                        //throw HTTPError(statusCode: 501, message: "Exception happundo")
+                                        if let res = try await PingWorker(
+                                            problem: p, client: HTTPExplorationClient(),
+                                            depth: depth,
+                                            take: ttake
+                                        ).run() {
+                                            print("Found solution with \(res)")
+                                            break
+                                        }
+                                    } catch let error {
+                                        print("Exception happened \(error)")
                                     }
                                     print("retrying \(retry)")
                                 }

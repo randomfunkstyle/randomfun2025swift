@@ -46,7 +46,7 @@ public struct Problem {
     }
 
     public static func gridProblems() -> [Problem] {
-        return [iod, teth, hhet, zain, vau, he, daleth, gimel, beth, aleph]
+        return [ iod, teth, hhet, zain, vau, he, daleth, gimel, beth, aleph]
     }
 }
 

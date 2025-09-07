@@ -88,11 +88,14 @@ public class HTTPTaskClient {
     }
 }
 
-struct HTTPError: Error, LocalizedError {
+public struct HTTPError: Error, LocalizedError {
     let statusCode: Int
     let message: String
-
-    var errorDescription: String? {
+    public init(statusCode: Int, message:String){
+        self.statusCode = statusCode
+        self.message = message
+    }
+    public var errorDescription: String? {
         return "HTTP Error \(statusCode): \(message)"
     }
 }
