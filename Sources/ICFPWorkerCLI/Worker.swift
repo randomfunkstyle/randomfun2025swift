@@ -44,10 +44,12 @@ struct CountLines: AsyncParsableCommand {
                 for depth in 1...5 {
                     for take in 5...15 {
                         print("Running with depth \(depth) and take \(take)")
-                        try await FindEverythingWorker(
-                            problem: .aleph, client: HTTPExplorationClient(), depth: depth,
-                            take: take
-                        ).run()
+                        if #available(macOS 13.0, *) {
+                            try await FindEverythingWorker(
+                                problem: .aleph, client: HTTPExplorationClient(), depth: depth,
+                                take: take
+                            ).run()
+                        }
                     }
                 }
 

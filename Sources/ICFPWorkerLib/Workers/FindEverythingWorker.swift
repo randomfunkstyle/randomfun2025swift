@@ -1,3 +1,4 @@
+
 @available(macOS 13.0, *)
 public final class FindEverythingWorker: Worker {
     let depth: Int
@@ -26,14 +27,14 @@ public final class FindEverythingWorker: Worker {
         // External label
         let label: Int
         var path: [Int]
-        var doors: [ExploratoinDoor] = (0..<6).map { ExploratoinDoor(id: String($0)) }
+        var doors: [ExploratoinDoor] = (0 ..< 6).map { ExploratoinDoor(id: String($0)) }
 
         init(label: Int, path: [Int], roomsCount: Int) {
             self.label = label
             self.path = path
 
             var potential = Set<Int>()
-            for i in 0..<roomsCount {
+            for i in 0 ..< roomsCount {
                 potential.insert(i)
             }
             self.potential = potential
@@ -64,28 +65,7 @@ public final class FindEverythingWorker: Worker {
         init(totalRoomsCount: Int, depth: Int) {
             self.totalRoomsCount = totalRoomsCount
             self.depth = depth
-            self.definedRooms = Array(repeating: nil, count: totalRoomsCount)
-        }
-
-        private var debug: Bool = true
-        func log(_ message: @autoclosure () -> String) {
-            if debug {
-                print("[KnownState] \(message())")
-            }
-        }
-
-        private var debugCompact: Bool = false
-        func log3(_ message: @autoclosure () -> String) {
-            if debugCompact {
-                print("[Compact] \(message())")
-            }
-        }
-
-        private var debugCleanup: Bool = false
-        func log4(_ message: @autoclosure () -> String) {
-            if debugCleanup {
-                print("[Cleanup] \(message())")
-            }
+            definedRooms = Array(repeating: nil, count: totalRoomsCount)
         }
 
         func boundAndUnboundDoors() -> (definedDoors: Int, undefined: Int) {
@@ -109,7 +89,7 @@ public final class FindEverythingWorker: Worker {
         }
 
         func path(to room: ExplorationRoom) -> [Int]? {
-            var queue = [(room: self.rootRoom!, path: [Int]())]
+            var queue = [(room: rootRoom!, path: [Int]())]
             var visited = [ExplorationRoom]()
 
             while !queue.isEmpty {
@@ -160,8 +140,8 @@ public final class FindEverythingWorker: Worker {
                 let (current, path) = queue.removeFirst()
                 visited.append(current)
 
-                if current.index == nil
-                    && current.doors.contains(where: { $0.destinationRoom == nil })
+                if current.index == nil,
+                   current.doors.contains(where: { $0.destinationRoom == nil })
                 {
                     topRooms.append(current)
 
@@ -208,7 +188,8 @@ public final class FindEverythingWorker: Worker {
 
             func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom) -> ExplorationRoom {
                 let mergedRoom = ExplorationRoom(
-                    label: room1.label, path: room1.path, roomsCount: totalRoomsCount)
+                    label: room1.label, path: room1.path, roomsCount: totalRoomsCount
+                )
                 mergedRoom.potential = room1.potential.intersection(room2.potential)
                 processedRooms.append(mergedRoom)
                 processChildren(unboundRoom: room1, boundRoom: room2)
@@ -222,31 +203,29 @@ public final class FindEverythingWorker: Worker {
                 for (unboundRoomDoor, boundRoomDoor) in zip(unboundRoom.doors, boundRoom.doors) {
                     // Simplest case, we don't have info about door but roomDoor has it
                     if boundRoomDoor.destinationRoom == nil,
-                        let roomDestination = unboundRoomDoor.destinationRoom
+                       let roomDestination = unboundRoomDoor.destinationRoom
                     {
                         boundRoomDoor.destinationRoom = roomDestination
                     } else if unboundRoomDoor.destinationRoom == nil,
-                        let definedRoomDestination = boundRoomDoor.destinationRoom
+                              let definedRoomDestination = boundRoomDoor.destinationRoom
                     {
                         unboundRoomDoor.destinationRoom = definedRoomDestination
                     } else if let boundDestinationRoom = boundRoomDoor.destinationRoom,
-                        let unboundDestinationRoom = unboundRoomDoor.destinationRoom,
-                        boundDestinationRoom !== unboundDestinationRoom
+                              let unboundDestinationRoom = unboundRoomDoor.destinationRoom,
+                              boundDestinationRoom !== unboundDestinationRoom
                     {
-
                         // Merge Information from the doorZ
 
                         let mergedRoom = mergeTwoRooms(
-                            room1: boundDestinationRoom, room2: unboundDestinationRoom)
+                            room1: boundDestinationRoom, room2: unboundDestinationRoom
+                        )
                         boundRoomDoor.destinationRoom = mergedRoom
                         unboundRoomDoor.destinationRoom = mergedRoom
-
                     }
                 }
             }
 
             for room in unboundedRooms {
-
                 guard !processedRooms.contains(where: { $0 === room }) else { continue }
                 removeAllInvalidPotentialIndexes(room)
 
@@ -260,18 +239,16 @@ public final class FindEverythingWorker: Worker {
 
                 // Merge information with the defined room, if we know everything about it
                 if let definedRoom = definedRooms[index] {
-
                     processChildren(unboundRoom: room, boundRoom: definedRoom)
 
                 } else {
                     // This is a new unique room found (The last room)
-                    log("[2]Found LAST? unique room: \(room.label) \(room.path)")
+                    logKnownState("[2]Found LAST? unique room: \(room.label) \(room.path)")
                     room.potential = Set([foundUniqueRooms])
                     foundUniqueRooms += 1
                     definedRooms[room.index!] = room
-                    log("Added unique room: with \(room.index!)")
+                    logKnownState("Added unique room: with \(room.index!)")
                 }
-
             }
 
             // Replace all destinationRooms to defined rooms, if possible
@@ -284,7 +261,6 @@ public final class FindEverythingWorker: Worker {
                     removeAllInvalidPotentialIndexes(destRoom)
 
                     if let idx = destRoom.index {
-
                         // Replace door with defined rooms
                         log3(
                             "Replacing door destination room \(String(describing: door.destinationRoom)) with defined room \(idx)"
@@ -297,10 +273,10 @@ public final class FindEverythingWorker: Worker {
                         //  basically here we need to merge all possible information from the destRoom to the definedRoom
                         //  so if destRoom has door to some other room, we need to copy that
                         if isMagicNeeded {
-                            for i in 0..<5 {
+                            for i in 0 ..< 5 {
                                 if definedRoom.doors[i].destinationRoom == nil,
-                                    door.destinationRoom?.doors[i].destinationRoom != nil,
-                                    let someDoor = door.destinationRoom?.doors[i]
+                                   door.destinationRoom?.doors[i].destinationRoom != nil,
+                                   let someDoor = door.destinationRoom?.doors[i]
                                 {
                                     definedRoom.doors[i] = someDoor
                                 }
@@ -310,8 +286,7 @@ public final class FindEverythingWorker: Worker {
                         }
 
                         door.destinationRoom = definedRoom
-                        // TODO:Potentially, we would need to merge information form the destRoom with a defined one <---
-
+                        // TODO: Potentially, we would need to merge information form the destRoom with a defined one <---
                     }
                 }
             }
@@ -363,29 +338,26 @@ public final class FindEverythingWorker: Worker {
 
                 if isDifferent(
                     room: roomDoorDestinationRoom, definedRoom: definedRoomDoorDestinationRoom,
-                    depth: depth - 1)
-                {
+                    depth: depth - 1
+                ) {
                     return true
                 }
             }
 
             return false
-
         }
 
         private func addRoom(_ room: ExplorationRoom) {
-
             if room.index != nil {
-
                 // Room kind'a bounded, but check if there's defined room with the same index
                 guard definedRooms[room.index!] == nil else { return }
 
                 // This is a new unique room found
-                log("[3]Found new unique room: \(room.label) \(room.path)")
-                room.potential = Set([foundUniqueRooms])  // 0
+                logKnownState("[3]Found new unique room: \(room.label) \(room.path)")
+                room.potential = Set([foundUniqueRooms]) // 0
                 foundUniqueRooms += 1
                 definedRooms[room.index!] = room
-                log("Added unique room: with \(room.index!)")
+                logKnownState("Added unique room: with \(room.index!)")
                 unboundedRooms.removeAll(where: { $0 === room })
 
                 return
@@ -401,31 +373,23 @@ public final class FindEverythingWorker: Worker {
             // 6  <=          6
             if room.potential.count <= totalRoomsCount - foundUniqueRooms {
                 // This is a new unique room found
-                log("[1]Found new unique room: \(room.label) \(room.path)")
-                room.potential = Set([foundUniqueRooms])  // 0
+                logKnownState("[1]Found new unique room: \(room.label) \(room.path)")
+                room.potential = Set([foundUniqueRooms]) // 0
                 foundUniqueRooms += 1
                 definedRooms[room.index!] = room
-                log("Added unique room: with \(room.index!)")
+                logKnownState("Added unique room: with \(room.index!)")
                 unboundedRooms.removeAll(where: { $0 === room })
             }
-
         }
     }
 
     private var knownState: KnownState
 
-    private var debug: Bool = true
-    func log(_ message: @autoclosure () -> String) {
-        if debug {
-            print("[GenerateEverythingWorker] \(message())")
-        }
-    }
-
     public init(
         problem: Problem, client: ExplorationClient, depth: Int, take: Int, debug: Bool = true
     ) {
-        self.knownState = KnownState(totalRoomsCount: problem.roomsCount, depth: depth)
-        self.debug = debug
+        knownState = KnownState(totalRoomsCount: problem.roomsCount, depth: depth)
+        debugFindEverythingWorker = debug
         self.depth = depth
         self.take = take
         super.init(problem: problem, client: client)
@@ -451,14 +415,17 @@ public final class FindEverythingWorker: Worker {
         return it < 500
     }
 
+    private var maxQuerySize: Int { problem.roomsCount * 6 }
+
     private var submittedQueries: [String] = []
     // mapping from label we used on the previous step to our room IDs
     private var assignedLabels: [Int: Int] = [:]
 
-    func generateRandomQuery() -> String {
+    /// Generate random query of maxQuerySize length
+    private func generateRandomQuery() -> String {
         var randomQuery = ""
-        for _ in 0..<(problem.roomsCount * 6) {
-            randomQuery += String(Int.random(in: 0..<6))
+        for _ in 0 ..< maxQuerySize {
+            randomQuery += String(Int.random(in: 0 ..< 6))
         }
         return randomQuery
     }
@@ -475,13 +442,13 @@ public final class FindEverythingWorker: Worker {
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
                 print("🍈 Will explore door \(door.id) in room \(room)")
 
-                for i in 0..<1 {
+                for i in 0 ..< 1 {
                     if let path = knownState.path(to: room) {
                         let additionalQuer = path + [Int(door.id)!, i]
                         let additionalQueryString =
                             additionalQuer.map { String($0) }.joined()
-                            + generateRandomQuery()
-                        let final = String(additionalQueryString.prefix(problem.roomsCount * 6))
+                                + generateRandomQuery()
+                        let final = String(additionalQueryString.prefix(maxQuerySize))
                         plans.append(final)
                     }
                 }
@@ -502,8 +469,8 @@ public final class FindEverythingWorker: Worker {
                     let additionalQuer = path + [Int(door.id)!]
                     let additionalQueryString =
                         additionalQuer.map { String($0) }.joined()
-                        + generateRandomQuery()
-                    let final = String(additionalQueryString.prefix(problem.roomsCount * 6))
+                            + generateRandomQuery()
+                    let final = String(additionalQueryString.prefix(maxQuerySize))
                     plans.append(final)
                 }
             }
@@ -529,8 +496,8 @@ public final class FindEverythingWorker: Worker {
     override public func generatePlans() -> [String] {
         knownState.updatePaths()
 
-        let lastSubmitted = self.submittedQueries
-        self.submittedQueries = []
+        let lastSubmitted = submittedQueries
+        submittedQueries = []
 
         let generators: [() -> [String]] = [
             regularPlans,
@@ -539,20 +506,19 @@ public final class FindEverythingWorker: Worker {
         ]
 
         for generator in generators {
-
             let plans = generator()
 
             if !plans.isEmpty {
-                self.submittedQueries = plans
+                submittedQueries = plans
                 break
             }
         }
 
-        if lastSubmitted == self.submittedQueries {
+        if lastSubmitted == submittedQueries {
             print("This is the end of the world, no new queries to submit")
         }
 
-        return self.submittedQueries
+        return submittedQueries
     }
 
     override public func generateGuess() -> MapDescription {
@@ -561,7 +527,6 @@ public final class FindEverythingWorker: Worker {
         for room in allRooms {
             for door in room.doors {
                 if let destinationRoom = door.destinationRoom {
-
                     if door.destinationDoor == nil {
                         /// Connect somehow door
                         ///
@@ -585,13 +550,15 @@ public final class FindEverythingWorker: Worker {
                 let desinaroomIndex = allRooms.firstIndex(where: { $0 === door.destinationRoom })!
                 let toDoor = door.destinationDoor!.id
                 connections.connect(
-                    room: roomIndex, door: doorIndex, toRoom: desinaroomIndex, toDoor: Int(toDoor)!)
+                    room: roomIndex, door: doorIndex, toRoom: desinaroomIndex, toDoor: Int(toDoor)!
+                )
             }
         }
 
         return MapDescription(
             rooms: knownState.definedRooms.compactMap { $0 }.map { $0.label }, startingRoom: 0,
-            connections: connections)
+            connections: connections
+        )
     }
 
     private func createExplorationRoom(label: Int, path: [Int]) -> ExplorationRoom {
@@ -602,14 +569,6 @@ public final class FindEverythingWorker: Worker {
         var room: ExplorationRoom
         init(room: ExplorationRoom) {
             self.room = room
-        }
-
-    }
-
-    private var debugExploration: Bool = false
-    func log2(_ message: @autoclosure () -> String) {
-        if debugExploration {
-            print("[ProcessExplored] \(message())")
         }
     }
 
@@ -651,7 +610,6 @@ public final class FindEverythingWorker: Worker {
 
     override public func processExplored(explored: ExploreResponse) {
         for (query, result) in zip(submittedQueries, explored.results) {
-
             let querySteps = parseQuery(query)
 
             var currentPath: [Int] = []
@@ -667,7 +625,7 @@ public final class FindEverythingWorker: Worker {
 
             let pointer = RoomState(room: currentRoom)
 
-            for i in 0..<querySteps.count {
+            for i in 0 ..< querySteps.count {
                 let (fromDoor, label) = querySteps[i]
                 let fromRoom = result[i]
                 let toRoom = result[i + 1]
@@ -682,9 +640,8 @@ public final class FindEverythingWorker: Worker {
 
                 let door = pointer.room.doors[fromDoor]
                 if let destinationRoom = door.destinationRoom {
-
                     if let idx = destinationRoom.index,
-                        knownState.definedRooms[idx] !== destinationRoom
+                       knownState.definedRooms[idx] !== destinationRoom
                     {
                         door.destinationRoom = knownState.definedRooms[idx]
                         pointer.room = knownState.definedRooms[idx]!
@@ -723,7 +680,6 @@ public final class FindEverythingWorker: Worker {
 
                     log2("[3]Current room changed to \(pointer.room)")
                 }
-
             }
         }
 
@@ -732,5 +688,43 @@ public final class FindEverythingWorker: Worker {
         )
 
         log2("Known state: \(knownState)")
+    }
+}
+
+// MARK: - Fileprivate Log Functions
+
+private var debugFindEverythingWorker: Bool = true
+private var debugProcessExplored: Bool = false
+private var debugKnownState: Bool = true
+private var debugCompact: Bool = false
+private var debugCleanup: Bool = false
+
+private func log(_ message: @autoclosure () -> String) {
+    if debugFindEverythingWorker {
+        print("[FindEverythingWorker] \(message())")
+    }
+}
+
+private func log2(_ message: @autoclosure () -> String) {
+    if debugProcessExplored {
+        print("[ProcessExplored] \(message())")
+    }
+}
+
+private func logKnownState(_ message: @autoclosure () -> String) {
+    if debugKnownState {
+        print("[KnownState] \(message())")
+    }
+}
+
+private func log3(_ message: @autoclosure () -> String) {
+    if debugCompact {
+        print("[Compact] \(message())")
+    }
+}
+
+private func log4(_ message: @autoclosure () -> String) {
+    if debugCleanup {
+        print("[Cleanup] \(message())")
     }
 }
