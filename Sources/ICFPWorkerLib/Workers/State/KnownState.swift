@@ -381,9 +381,9 @@ class KnownState {
         }
     }
 
-    public func constructGraph() -> GraphNode? {
+    public func constructGraph() -> [GraphNode] {
         guard let startingPoint = rootRoom else {
-            return nil
+            return []
         }
 
         var roomToGraphNode: [Int: GraphNode] = [:]
@@ -419,7 +419,7 @@ class KnownState {
             }
         }
 
-        return roomToGraphNode[startingPoint.serializationId]
+        return Array(roomToGraphNode.values)
     }
 }
 

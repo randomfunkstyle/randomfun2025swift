@@ -15,15 +15,15 @@ public class GraphNode: Codable {
 }
 
 public class LogState: Codable {
-    var graphBefore: GraphNode?
-    var graphAfter: GraphNode?
+    var graphBefore: [GraphNode]
+    var graphAfter: [GraphNode]
 
     var query: String
     var result: [Int]
     var isPingQuery: Bool
 
     init(
-        graphBefore: GraphNode?, graphAfter: GraphNode?,
+        graphBefore: [GraphNode], graphAfter: [GraphNode],
         query: String, result: [Int], isPingQuery: Bool
     ) {
         self.graphBefore = graphBefore
