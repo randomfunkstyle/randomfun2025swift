@@ -1,4 +1,5 @@
 
+@available(macOS 13.0, *)
 public final class GenerateEverythingWorker: Worker {
 
 
