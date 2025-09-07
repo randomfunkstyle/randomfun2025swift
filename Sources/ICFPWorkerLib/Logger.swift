@@ -47,7 +47,7 @@ public class Logger {
     }
 
     func log(logState: LogState) {
-        print("📝 Logging state...")
+//        print("📝 Logging state...")
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
@@ -90,6 +90,6 @@ public class Logger {
             print("❌ Failed to write to file: \(error.localizedDescription)")
         }
 
-        print("✅ Logged state to: \(fileURL.path)")
+//        print("✅ Logged state to: \(fileURL.path)")
     }
 }

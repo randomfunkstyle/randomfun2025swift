@@ -173,22 +173,18 @@ class KnownState {
 
         var processedRooms: [ExplorationRoom] = []
 
-        func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom) -> ExplorationRoom {
-            let mergedRoom = ExplorationRoom(
-                label: room1.label, path: room1.path, roomsCount: totalRoomsCount
-            )
+        func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom, processedPairs: inout [(Int, Int)]) -> ExplorationRoom {
+            let mergedRoom = room1
             mergedRoom.potential = room1.potential.intersection(room2.potential)
             processedRooms.append(mergedRoom)
-            processChildren(unboundRoom: room1, boundRoom: room2)
-            for (mergedDoor, room1) in zip(mergedRoom.doors, room1.doors) {
-                mergedDoor.destinationRoom = room1.destinationRoom
-            }
+            processChildren(unboundRoom: room1, boundRoom: room2, processedPairs: &processedPairs)
             return mergedRoom
         }
 
-        func processChildren(unboundRoom: ExplorationRoom, boundRoom: ExplorationRoom) {
+        func processChildren(unboundRoom: ExplorationRoom, boundRoom: ExplorationRoom, processedPairs: inout [(Int, Int)]) {
             guard unboundRoom !== boundRoom else { return }
-            guard !processedRooms.contains(where: { $0 === unboundRoom }) else { return }
+            guard !processedPairs.contains(where: { $0.0 == unboundRoom.serializationId && $0.1 == boundRoom.serializationId }) else { return }
+            processedPairs.append((unboundRoom.serializationId, boundRoom.serializationId))
             processedRooms.append(unboundRoom)
 
             for (unboundRoomDoor, boundRoomDoor) in zip(unboundRoom.doors, boundRoom.doors) {
@@ -208,7 +204,7 @@ class KnownState {
                     // Merge Information from the doorZ
 
                     let mergedRoom = mergeTwoRooms(
-                        room1: boundDestinationRoom, room2: unboundDestinationRoom
+                        room1: boundDestinationRoom, room2: unboundDestinationRoom, processedPairs: &processedPairs
                     )
                     boundRoomDoor.destinationRoom = mergedRoom
                     unboundRoomDoor.destinationRoom = mergedRoom
@@ -230,7 +226,8 @@ class KnownState {
 
             // Merge information with the defined room, if we know everything about it
             if let definedRoom = definedRooms[index] {
-                processChildren(unboundRoom: room, boundRoom: definedRoom)
+                var processedPairs: [(Int, Int)] = []
+                processChildren(unboundRoom: room, boundRoom: definedRoom, processedPairs: &processedPairs)
             } else {
                 // This is a new unique room found (The last room)
                 logKnownState("[2]Found LAST? unique room: \(room.label) \(room.path)")
