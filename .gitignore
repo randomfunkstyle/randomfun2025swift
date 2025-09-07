@@ -66,3 +66,5 @@ fastlane/test_output
 .swiftpm/xcode/package.xcworkspace/
 .env
 *.xcscheme
+
+2025*.json
