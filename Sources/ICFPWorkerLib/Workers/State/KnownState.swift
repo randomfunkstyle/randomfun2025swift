@@ -22,11 +22,12 @@ class KnownState {
             mermaidMap += "end\n"
         }
 
-        // Connections 
+        // Connections
         for (index, room) in definedRooms.compactMap({ $0 }).enumerated() {
             for (doorIndex, door) in room.doors.enumerated() {
                 guard let destinationRoom = door.destinationRoom else { continue }
-                mermaidMap += "N\(index)\(doorIndex) -- N\(destinationRoom.index!)\(door.destinationDoor!.id)\n"
+                mermaidMap +=
+                    "N\(index)\(doorIndex) -- N\(destinationRoom.index!)\(door.destinationDoor!.id)\n"
             }
         }
 
@@ -68,7 +69,9 @@ class KnownState {
         return labels
     }
 
-    func path(from: ExplorationRoom? = nil,with query: (ExplorationRoom) -> Bool) -> ([Int], ExplorationRoom)? {
+    func path(from: ExplorationRoom? = nil, with query: (ExplorationRoom) -> Bool) -> (
+        [Int], ExplorationRoom
+    )? {
         let from = from ?? rootRoom!
         var queue = [(room: from, path: [Int]())]
         var visited = [ExplorationRoom]()
@@ -125,7 +128,7 @@ class KnownState {
             visited.append(current)
 
             if current.index == nil,
-               current.doors.contains(where: { $0.destinationRoom == nil })
+                current.doors.contains(where: { $0.destinationRoom == nil })
             {
                 topRooms.append(current)
 
@@ -187,16 +190,16 @@ class KnownState {
             for (unboundRoomDoor, boundRoomDoor) in zip(unboundRoom.doors, boundRoom.doors) {
                 // Simplest case, we don't have info about door but roomDoor has it
                 if boundRoomDoor.destinationRoom == nil,
-                   let roomDestination = unboundRoomDoor.destinationRoom
+                    let roomDestination = unboundRoomDoor.destinationRoom
                 {
                     boundRoomDoor.destinationRoom = roomDestination
                 } else if unboundRoomDoor.destinationRoom == nil,
-                          let definedRoomDestination = boundRoomDoor.destinationRoom
+                    let definedRoomDestination = boundRoomDoor.destinationRoom
                 {
                     unboundRoomDoor.destinationRoom = definedRoomDestination
                 } else if let boundDestinationRoom = boundRoomDoor.destinationRoom,
-                          let unboundDestinationRoom = unboundRoomDoor.destinationRoom,
-                          boundDestinationRoom !== unboundDestinationRoom
+                    let unboundDestinationRoom = unboundRoomDoor.destinationRoom,
+                    boundDestinationRoom !== unboundDestinationRoom
                 {
                     // Merge Information from the doorZ
 
@@ -257,10 +260,10 @@ class KnownState {
                     //  basically here we need to merge all possible information from the destRoom to the definedRoom
                     //  so if destRoom has door to some other room, we need to copy that
                     if isMagicNeeded {
-                        for i in 0 ..< 5 {
+                        for i in 0..<5 {
                             if definedRoom.doors[i].destinationRoom == nil,
-                               door.destinationRoom?.doors[i].destinationRoom != nil,
-                               let someDoor = door.destinationRoom?.doors[i]
+                                door.destinationRoom?.doors[i].destinationRoom != nil,
+                                let someDoor = door.destinationRoom?.doors[i]
                             {
                                 definedRoom.doors[i] = someDoor
                             }
@@ -310,10 +313,56 @@ class KnownState {
         }
     }
 
-    func isDifferent(room: ExplorationRoom, definedRoom: ExplorationRoom, depth: Int) -> Bool {
-        guard depth > 0 else { return false }
+    func bfsIsDifferent(room: ExplorationRoom, definedRoom: ExplorationRoom, maxDepth: Int) -> Bool
+    {
+        guard maxDepth > 0 else { return false }
         guard room.label == definedRoom.label else { return true }
-        
+
+        if let roomIndex = room.index, let definedRoomIndex = definedRoom.index {
+            if roomIndex == definedRoomIndex {
+                return false
+            }
+        }
+
+        var queue = [(room: room, definedRoom: definedRoom, depth: 0)]
+
+        while !queue.isEmpty {
+            let (currentRoom, currentDefinedRoom, currentDepth) = queue.removeFirst()
+            if currentDepth >= maxDepth {
+                continue
+            }
+
+            for (roomDoor, definedRoomDoor) in zip(currentRoom.doors, currentDefinedRoom.doors) {
+                guard let definedRoomDoorDestinationRoom = definedRoomDoor.destinationRoom else {
+                    continue
+                }
+                guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
+
+                if roomDoorDestinationRoom.label != definedRoomDoorDestinationRoom.label {
+                    return true
+                }
+
+                if let roomIndex = roomDoorDestinationRoom.index,
+                    let definedRoomIndex = definedRoomDoorDestinationRoom.index
+                {
+                    if roomIndex != definedRoomIndex {
+                        return true
+                    }
+                }
+
+                queue.append(
+                    (roomDoorDestinationRoom, definedRoomDoorDestinationRoom, currentDepth + 1))
+            }
+        }
+
+        return false
+    }
+
+    func dfsIsDifferent(room: ExplorationRoom, definedRoom: ExplorationRoom, maxDepth: Int) -> Bool
+    {
+        guard maxDepth > 0 else { return false }
+        guard room.label == definedRoom.label else { return true }
+
         if let roomIndex = room.index, let definedRoomIndex = definedRoom.index {
             if roomIndex == definedRoomIndex {
                 return false
@@ -326,15 +375,27 @@ class KnownState {
             }
             guard let roomDoorDestinationRoom = roomDoor.destinationRoom else { continue }
 
-            if isDifferent(
-                room: roomDoorDestinationRoom, definedRoom: definedRoomDoorDestinationRoom,
-                depth: depth - 1
+            if dfsIsDifferent(
+                room: roomDoorDestinationRoom,
+                definedRoom: definedRoomDoorDestinationRoom,
+                maxDepth: maxDepth - 1
             ) {
                 return true
             }
         }
 
         return false
+    }
+
+    func isDifferent(room: ExplorationRoom, definedRoom: ExplorationRoom, depth: Int)
+        -> Bool
+    {
+        return measureTwoVariants(
+            "BFS",
+            bfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth),
+            "DFS",
+            dfsIsDifferent(room: room, definedRoom: definedRoom, maxDepth: depth)
+        )
     }
 
     private func addRoom(_ room: ExplorationRoom) {
@@ -344,7 +405,7 @@ class KnownState {
 
             // This is a new unique room found
             logKnownState("[3]Found new unique room: \(room.label) \(room.path)")
-            room.potential = Set([foundUniqueRooms]) // 0
+            room.potential = Set([foundUniqueRooms])  // 0
             foundUniqueRooms += 1
             definedRooms[room.index!] = room
             logKnownState("Added unique room: with \(room.index!)")
@@ -364,13 +425,44 @@ class KnownState {
         if room.potential.count <= totalRoomsCount - foundUniqueRooms {
             // This is a new unique room found
             logKnownState("[1]Found new unique room: \(room.label) \(room.path)")
-            room.potential = Set([foundUniqueRooms]) // 0
+            room.potential = Set([foundUniqueRooms])  // 0
             foundUniqueRooms += 1
             definedRooms[room.index!] = room
             logKnownState("Added unique room: with \(room.index!)")
             unboundedRooms.removeAll(where: { $0 === room })
         }
     }
+}
+
+private var iterationCounter: Int = 0
+private var measureMap: [String: TimeInterval] = [:]
+
+func measureTwoVariants<T: Equatable>(
+    _ name: String, _ first: @autoclosure () -> T, _ name2: String, _ second: @autoclosure () -> T
+) -> T {
+    let start = Date()
+    let result = first()
+    let duration = Date().timeIntervalSince(start)
+    measureMap[name, default: 0] += duration
+
+    let start2 = Date()
+    let result2 = second()
+    let duration2 = Date().timeIntervalSince(start2)
+    measureMap[name2, default: 0] += duration2
+
+    iterationCounter += 1
+
+    if iterationCounter % 1000 == 0 {
+        var total1 = measureMap[name] ?? 0
+        var total2 = measureMap[name2] ?? 0
+
+        let percentage = abs(total1 - total2) / max(total1, total2) * 100
+        let fasterVariant = total1 < total2 ? name : name2
+        print("\(fasterVariant) is faster by \(percentage)%")
+    }
+
+    assert(result == result2)
+    return result
 }
 
 private var debugCompact: Bool = false

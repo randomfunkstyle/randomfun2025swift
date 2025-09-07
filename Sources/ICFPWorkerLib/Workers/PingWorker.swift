@@ -1,4 +1,3 @@
-
 @available(macOS 13.0, *)
 public final class PingWorker: Worker {
     let depth: Int
@@ -27,7 +26,9 @@ public final class PingWorker: Worker {
         let totalDoors = problem.roomsCount * 6
         let percentageOfDefinedDoors: Int = definedDoors * 100 / totalDoors
         if undefinedDoors != 0 {
-            print("😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors of \(totalDoors) (\(percentageOfDefinedDoors)%)")
+            print(
+                "😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors of \(totalDoors) (\(percentageOfDefinedDoors)%)"
+            )
         }
 
         if uniqueRooms == problem.roomsCount && zeroDoors == 0 && undefinedDoors == 0 {
@@ -40,7 +41,7 @@ public final class PingWorker: Worker {
         if istooLong {
             print("Too many iterations \(it) 🔥 :(")
             print("Continue? (y/n)")
-            
+
             // Ask for input and to continue if possible
             let response = readLine(strippingNewline: true)
             if response?.lowercased() == "y" {
@@ -51,7 +52,7 @@ public final class PingWorker: Worker {
             print("Stopping...")
             return false
         }
-            
+
         return true
     }
 
@@ -62,8 +63,8 @@ public final class PingWorker: Worker {
     /// Generate random query of maxQuerySize length
     private func generateRandomQuery() -> String {
         var randomQuery = ""
-        for _ in 0 ..< maxQuerySize {
-            randomQuery += String(Int.random(in: 0 ..< 6))
+        for _ in 0..<maxQuerySize {
+            randomQuery += String(Int.random(in: 0..<6))
         }
         return randomQuery
     }
@@ -88,16 +89,23 @@ public final class PingWorker: Worker {
         let boundRooms = knownState.definedRooms.compactMap { $0 }
 
         let pathsWithBoundRooms = boundRooms.compactMap { boundRoom in
-            knownState.path(from: boundRoom, with: { room in
-                room.index == nil && room.potential.contains(boundRoom.index!)
-            })
+            knownState.path(
+                from: boundRoom,
+                with: { room in
+                    room.index == nil && room.potential.contains(boundRoom.index!)
+                }
+            )
             .map { (bound: boundRoom, potential: (room: $0.1, path: $0.0)) }
         }
 
-        let sortPotentials = pathsWithBoundRooms.sorted(by: { $0.1.room.potential.count < $1.1.room.potential.count })
+        let sortPotentials = pathsWithBoundRooms.sorted(by: {
+            $0.1.room.potential.count < $1.1.room.potential.count
+        })
 
         // Select one of pathsWithBoundRooms
-        let sortedPotentialsWithoutKnown = sortPotentials.first(where: { knownState.path(to: $0.bound) != nil })
+        let sortedPotentialsWithoutKnown = sortPotentials.first(where: {
+            knownState.path(to: $0.bound) != nil
+        })
         guard let (bound, potential) = sortedPotentialsWithoutKnown else {
             return []
         }
@@ -139,7 +147,7 @@ public final class PingWorker: Worker {
 
         print("Explored Results: \(result)")
 
-        for i in 0 ..< querySteps.count {
+        for i in 0..<querySteps.count {
             let fromDoorC = querySteps[querySteps.index(querySteps.startIndex, offsetBy: i)]
             guard let fromDoor = Int(String(fromDoorC)) else {
                 continue
@@ -160,7 +168,9 @@ public final class PingWorker: Worker {
                 // We changed that bounded one, but we didn't see the expect change in the potential
                 destinationRoom.potential.remove(pingQuery.boundRoomIndex)
 
-                print("🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at lease we removed one potential \(pingQuery.boundRoomIndex)")
+                print(
+                    "🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at lease we removed one potential \(pingQuery.boundRoomIndex)"
+                )
             }
 
             pointer.room = destinationRoom
@@ -178,22 +188,22 @@ public final class PingWorker: Worker {
 
         let roomsWeInterstedIn =
             knownState.definedRooms
-                .compactMap { $0 }
-                .filter { pingQuery?.boundRoomIndex == $0.index }
-                .filter { room in
-                    room.doors.contains(where: { $0.destinationRoom == nil })
-                }.shuffled().prefix(take)
+            .compactMap { $0 }
+            .filter { pingQuery?.boundRoomIndex == $0.index }
+            .filter { room in
+                room.doors.contains(where: { $0.destinationRoom == nil })
+            }.shuffled().prefix(take)
 
         for room in roomsWeInterstedIn {
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
                 print("🌺 explore door \(door.id) in room \(room)")
 
-                for i in 0 ..< 1 {
+                for i in 0..<1 {
                     if let path = knownState.path(to: room) {
                         let additionalQuer = path + [Int(door.id)!, i]
                         let additionalQueryString =
                             additionalQuer.map { String($0) }.joined()
-                                + generateRandomQuery()
+                            + generateRandomQuery()
                         let final = String(additionalQueryString.prefix(maxQuerySize))
                         plans.append(final)
                     }
@@ -219,12 +229,12 @@ public final class PingWorker: Worker {
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
                 print("🍈 Will explore door \(door.id) in room \(room)")
 
-                for i in 0 ..< 1 {
+                for i in 0..<1 {
                     if let path = knownState.path(to: room) {
                         let additionalQuer = path + [Int(door.id)!, i]
                         let additionalQueryString =
                             additionalQuer.map { String($0) }.joined()
-                                + generateRandomQuery()
+                            + generateRandomQuery()
                         let final = String(additionalQueryString.prefix(maxQuerySize))
                         plans.append(final)
                     }
@@ -246,7 +256,7 @@ public final class PingWorker: Worker {
                     let additionalQuer = path + [Int(door.id)!]
                     let additionalQueryString =
                         additionalQuer.map { String($0) }.joined()
-                            + generateRandomQuery()
+                        + generateRandomQuery()
                     let final = String(additionalQueryString.prefix(maxQuerySize))
                     plans.append(final)
                 }
@@ -315,10 +325,10 @@ public final class PingWorker: Worker {
             // We definetly know that all doors are connected somewher
             for door in room.doors {
 
-
-                guard let destinationRoom = door.destinationRoom else{
+                guard let destinationRoom = door.destinationRoom else {
                     printMermaidOnError()
-                    fatalError("Door \(door.id) in room \(room) has no back door. How did we get there?")
+                    fatalError(
+                        "Door \(door.id) in room \(room) has no back door. How did we get there?")
                 }
 
                 guard door.destinationDoor != nil else {
@@ -329,11 +339,14 @@ public final class PingWorker: Worker {
                 /// Connect somehow door
 
                 // Find firs door that goes back
-                guard let backDoor = destinationRoom.doors.first(where: {
-                    $0.destinationRoom!.index! == room.index! && $0.destinationDoor == nil
-                }) else {
+                guard
+                    let backDoor = destinationRoom.doors.first(where: {
+                        $0.destinationRoom!.index! == room.index! && $0.destinationDoor == nil
+                    })
+                else {
                     printMermaidOnError()
-                    fatalError("Door \(door.id) in room \(room) has no back door. How did we get there?")
+                    fatalError(
+                        "Door \(door.id) in room \(room) has no back door. How did we get there?")
                 }
 
                 door.destinationDoor = backDoor
@@ -428,7 +441,7 @@ public final class PingWorker: Worker {
 
             let pointer = RoomState(room: currentRoom)
 
-            for i in 0 ..< querySteps.count {
+            for i in 0..<querySteps.count {
                 let (fromDoor, label) = querySteps[i]
                 let fromRoom = result[i]
                 let toRoom = result[i + 1]
@@ -444,7 +457,7 @@ public final class PingWorker: Worker {
                 let door = pointer.room.doors[fromDoor]
                 if let destinationRoom = door.destinationRoom {
                     if let idx = destinationRoom.index,
-                       knownState.definedRooms[idx] !== destinationRoom
+                        knownState.definedRooms[idx] !== destinationRoom
                     {
                         door.destinationRoom = knownState.definedRooms[idx]
                         pointer.room = knownState.definedRooms[idx]!
