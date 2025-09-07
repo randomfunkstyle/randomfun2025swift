@@ -62,35 +62,45 @@ struct CountLines: AsyncParsableCommand {
                 print("Score: \(score)")
 
             case "Grid":
-                let problems: [Problem] = Problem.gridProblems()
+                let problems: [Problem] = Problem.gridProblems().reversed()
+                let timeFormatter = DateFormatter()
+                timeFormatter.dateFormat = "HH:mm:ss"
+   
+                while true {
+                    for depth in (3...5).reversed() {
+                        for take in (1...5).reversed() {
+                            for p in problems {
 
-                for depth in (5...6).reversed() {
-                    for take in (1...5).reversed() {
-                        for p in problems {
+                                let ttake = take * 3
+                                let currentTime = Date()
+                                let formattedTime = timeFormatter.string(from: currentTime)
+                                
+                                print(
+                                    "\(formattedTime)\tRunning problem \(p.name) with depth \(depth) and take \(ttake)"
+                                )
+                                if #available(macOS 13.0, *) {
 
-                            let ttake = take * 3
-                            print("Running problem \(p.name) with depth \(depth) and take \(ttake)")
-                            if #available(macOS 13.0, *) {
-
-                                for retry: Int in 1...5 {
-                                    do {
-                                        //throw HTTPError(statusCode: 501, message: "Exception happundo")
-                                        if let res = try await PingWorker(
-                                            problem: p, client: HTTPExplorationClient(),
-                                            depth: depth,
-                                            take: ttake
-                                        ).run() {
-                                            print("Found solution with \(res)")
-                                            break
+                                    for retry: Int in 1...5 {
+                                        do {
+                                            //throw HTTPError(statusCode: 501, message: "Exception happundo")
+                                            if let res = try await PingWorker(
+                                                problem: p, client: HTTPExplorationClient(),
+                                                depth: depth,
+                                                take: ttake
+                                            ).run() {
+                                                print("Found solution with \(res)")
+                                                break
+                                            }
+                                        } catch let error {
+                                            print("Exception happened \(error)")
                                         }
-                                    } catch let error {
-                                        print("Exception happened \(error)")
+                                        print("retrying \(retry)")
                                     }
-                                    print("retrying \(retry)")
-                                }
 
+                                }
                             }
                         }
+
                     }
                 }
 
