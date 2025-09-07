@@ -61,6 +61,13 @@ def soft_max(matrix: np.ndarray) -> np.ndarray:
             # Maintain symmetry
             result[:, i] = normalized_values
 
+    # assert that all rows and columns sum to 1
+    for i in range(size):
+        row_sum = np.sum(result[i, :])
+        col_sum = np.sum(result[:, i])
+        if not (np.isclose(row_sum, 1.0) and np.isclose(col_sum, 1.0)):
+            raise ValueError("Row or column does not sum to 1 after softmax")
+
     return result
 
 
