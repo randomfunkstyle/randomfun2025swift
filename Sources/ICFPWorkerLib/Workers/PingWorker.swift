@@ -420,7 +420,7 @@ public final class PingWorker: Worker {
                         "Door \(door.id) in room \(room) has no back door. How did we get there?")
                 }
 
-                guard door.destinationDoor != nil else {
+                guard door.destinationDoor == nil else {
                     // We alread connected this door (not sure how, but still)
                     continue
                 }
