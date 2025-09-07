@@ -47,49 +47,50 @@ public class Logger {
     }
 
     func log(logState: LogState) {
-        print("📝 Logging state...")
+        return
+        // print("📝 Logging state...")
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
+        // let encoder = JSONEncoder()
+        // encoder.outputFormatting = .sortedKeys
 
-        let data: Data
+        // let data: Data
 
-        do {
-            data = try encoder.encode(logState)
-        } catch {
-            print("❌ Failed to encode log state to JSON: \(error.localizedDescription)")
-            return
-        }
+        // do {
+        //     data = try encoder.encode(logState)
+        // } catch {
+        //     print("❌ Failed to encode log state to JSON: \(error.localizedDescription)")
+        //     return
+        // }
 
-        guard
-            let jsonString = String(data: data, encoding: .utf8)?.replacingOccurrences(
-                of: "\n", with: "")
-        else {
-            print("❌ Failed to convert JSON data to string")
-            return
-        }
+        // guard
+        //     let jsonString = String(data: data, encoding: .utf8)?.replacingOccurrences(
+        //         of: "\n", with: "")
+        // else {
+        //     print("❌ Failed to convert JSON data to string")
+        //     return
+        // }
 
-        let currentDirectory = FileManager.default.currentDirectoryPath
-        let fileURL = URL(fileURLWithPath: currentDirectory).appendingPathComponent(file)
+        // let currentDirectory = FileManager.default.currentDirectoryPath
+        // let fileURL = URL(fileURLWithPath: currentDirectory).appendingPathComponent(file)
 
-        let finalString = jsonString + "\n"
+        // let finalString = jsonString + "\n"
 
-        do {
-            if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
-                fileHandle.seekToEndOfFile()
-                if let dataToWrite = finalString.data(using: .utf8) {
-                    fileHandle.write(dataToWrite)
-                } else {
-                    print("❌ Failed to convert final string to data for appending")
-                }
-                fileHandle.closeFile()
-            } else {
-                try finalString.write(to: fileURL, atomically: true, encoding: .utf8)
-            }
-        } catch {
-            print("❌ Failed to write to file: \(error.localizedDescription)")
-        }
+        // do {
+        //     if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
+        //         fileHandle.seekToEndOfFile()
+        //         if let dataToWrite = finalString.data(using: .utf8) {
+        //             fileHandle.write(dataToWrite)
+        //         } else {
+        //             print("❌ Failed to convert final string to data for appending")
+        //         }
+        //         fileHandle.closeFile()
+        //     } else {
+        //         try finalString.write(to: fileURL, atomically: true, encoding: .utf8)
+        //     }
+        // } catch {
+        //     print("❌ Failed to write to file: \(error.localizedDescription)")
+        // }
 
-        print("✅ Logged state to: \(fileURL.path)")
+        // print("✅ Logged state to: \(fileURL.path)")
     }
 }
