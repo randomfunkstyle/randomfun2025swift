@@ -207,6 +207,7 @@ public final class PingWorker: Worker {
     
     func processPingExplored(explored: ExploreResponse) {
         for (pingQuery, result) in zip(pingQueries, explored.results) {
+            let graphBefore = knownState.constructGraph()
             let querySteps = pingQuery.queryForProcessing
             
             let pointer = RoomState(room: knownState.rootRoom!)
@@ -263,17 +264,18 @@ public final class PingWorker: Worker {
             }
             // TODO: We only need to optimize and mark
             knownState.addRoomAndCompactRooms(pointer.room)
+            
+            let graphAfter = knownState.constructGraph()
+            let logState = LogState(
+                graphBefore: graphBefore,
+                graphAfter: graphAfter, query: pingQuery.query,
+                result: result,
+                isPingQuery: true
+            )
+            Logger.shared.log(logState: logState)
         }
         isPingQuery = false
 
-        let graphAfter = knownState.constructGraph()
-        let logState = LogState(
-            graphBefore: graphBefore,
-            graphAfter: graphAfter, query: pingQuery.query,
-            result: result,
-            isPingQuery: true
-        )
-        Logger.shared.log(logState: logState)
     }
     
     // MARK: - Regular ================================
