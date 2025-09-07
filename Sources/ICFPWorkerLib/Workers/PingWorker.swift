@@ -258,6 +258,11 @@ public final class PingWorker: Worker {
                         
                         // Ideally we want to merge these rooms together, but not right now or NOW
                         // TODO:
+                        var processedPairs: [(Int, Int)] = []
+                        var processedRooms: [ExplorationRoom] = []
+                        _ = knownState.mergeTwoRooms(room1: destinationRoom, room2: charcoaledRoom, processedPairs: &processedPairs, processedRooms: &processedRooms)
+                        
+                        /// MERGE THEM ALL!!!
                     }
                 }
                 // Temporay disabled
