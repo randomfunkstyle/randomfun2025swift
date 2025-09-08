@@ -194,10 +194,9 @@ public final class PingWorker: Worker {
                         charcoaled[room.label] = .init(room: room, prevLabel: room.label, nextLabel: nextLabel)
                         nextQuery.append(.charcoaled(nextLabel))
                     }
-
-                    cursor.moveToDoor(move.id)
                 }
-
+                
+                cursor.moveToDoor(move.id)
                 
                 itemsAdded += 1
             }
