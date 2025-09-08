@@ -1,4 +1,4 @@
-final class ExploratoinDoor {
+final class ExploratoinDoor: Equatable, CustomStringConvertible {
     
     static var nextID = 0
     let serializationId: Int
@@ -10,10 +10,10 @@ final class ExploratoinDoor {
     var destinationRoom: ExplorationRoom?
     
     /// This is the door in the destination room that leads back to this room
-    weak var destinationDoor: ExploratoinDoor?
+    var destinationDoor: ExploratoinDoor?
 
     // This is actually a weak reference to avoid retain cycles
-    weak var owner: ExplorationRoom? = nil
+    var owner: ExplorationRoom? = nil
 
     init(id: Int, owner: ExplorationRoom?) {
         self.id = id
@@ -22,7 +22,16 @@ final class ExploratoinDoor {
         ExploratoinDoor.nextID += 1
     }
 
+    static func == (lhs: ExploratoinDoor, rhs: ExploratoinDoor) -> Bool {
+        return lhs.serializationId == rhs.serializationId
+    }
     
+    var description: String {
+        let ownerId = owner!.serializationId
+        let destRoomId = (destinationRoom?.serializationId).map { String($0) } ?? "nil"
+        let destDoorId = (destinationDoor?.serializationId).map { String($0) } ?? "nil"
+        return "Door(id: \(id), owner: \(ownerId), destRoom: \(destRoomId), destDoor: \(destDoorId))"
+    }
 }
 
 

@@ -19,6 +19,8 @@ final class ExplorationRoom: CustomStringConvertible {
         return potential.first!
     }
 
+    var has6UniqueExternals: Bool = false
+    
     // External label
     let label: Int
     var path: [Int]
@@ -59,7 +61,7 @@ final class ExplorationRoom: CustomStringConvertible {
             }
         }.joined(separator: ", ")
         return
-            "Room(label: \(label), path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
+            "Room([\(serializationId)] label: \(label),path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
     }
 }
 

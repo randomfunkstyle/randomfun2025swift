@@ -25,11 +25,11 @@ public final class PingWorker: Worker {
         
         let totalDoors = problem.roomsCount * 6
         let percentageOfDefinedDoors: Int = definedDoors * 100 / totalDoors
-        // if undefinedDoors != 0 {
-        //     print(
-        //         "😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors of \(totalDoors) (\(percentageOfDefinedDoors)%)"
-        //     )
-        // }
+         if undefinedDoors != 0 {
+             print(
+                 "😢 !!!Undefined doors found: \(undefinedDoors) vs \(definedDoors) defined doors of \(totalDoors) (\(percentageOfDefinedDoors)%)"
+             )
+         }
         
         if uniqueRooms == problem.roomsCount && zeroDoors == 0 && undefinedDoors == 0 {
             print("Everything is FINE 🔥")
@@ -143,18 +143,22 @@ public final class PingWorker: Worker {
             
             let initialQuery = pathToBoundRoom.map { QueryMove.move($0) } + [QueryMove.charcoaled(nextLabel)] + potential.path.map { QueryMove.move($0) }
             var destinationIndex = initialQuery.count - 1
+            guard initialQuery.count < maxQuerySize - 10 else {
+                continue
+            }
             
             var charcoaled: [Label: PingQuery.CharCoaled] = [
                 previousLabel: .init(room: bound, prevLabel: previousLabel, nextLabel: nextLabel),
             ]
             
             var nextQuery: [QueryMove] = []
-            var currentRoom = knownState.rootRoom!
+            let cursor = RoomCursor(room: knownState.rootRoom!)
+            // var currentRoom = knownState.rootRoom!
             for move in initialQuery {
                 switch move {
                 case let .move(door):
                     nextQuery.append(.move(door))
-                    currentRoom = currentRoom.doors[door].destinationRoom!
+                    let currentRoom = cursor.moveToDoor(door)!
                     
                     if charcoaled[currentRoom.label] == nil && Int.random(in: 0 ..< 100) < 30 {
                         let nextLabel = (currentRoom.label + 1) % 4
@@ -168,29 +172,31 @@ public final class PingWorker: Worker {
                 }
             }
             
-            var currentRoomRandom: ExplorationRoom? = currentRoom
+            // var currentRoomRandom: ExplorationRoom? = currentRoom
             
             // Now we want to add some random move to the query just to make sure that we have longer path
             var itemsAdded = 0
-            while nextQuery.count < maxQuerySize - 20, let safeCurrentRoomRandom = currentRoomRandom {
-                guard let randomDoor = safeCurrentRoomRandom.doors.filter({ $0.destinationRoom != nil }).randomElement() else {
+            while nextQuery.count < maxQuerySize - 20 {
+
+                guard let move = cursor.randomMove() else {
                     break
                 }
-                nextQuery.append(.move(randomDoor.id))
-                
-                currentRoomRandom = randomDoor.destinationRoom
-                
-                if charcoaled[currentRoomRandom!.label] == nil {
-                    if Int.random(in: 0 ..< 100) < 10 || (currentRoomRandom!.index != nil && Int.random(in: 0 ..< 100) < 66) {
+                nextQuery.append(.move(move.id))
+
+                let room = move.room
+                                
+                if charcoaled[room.label] == nil {
+                    if Int.random(in: 0 ..< 100) < 10 || (room.index != nil && Int.random(in: 0 ..< 100) < 66) {
 //                        if currentRoomRandom!.index != nil {
 //                            print("🚁 Charcoaling already bounded room \(currentRoomRandom!)")
 //                        }
-                        let nextLabel = (currentRoomRandom!.label + 1) % 4
-                        charcoaled[currentRoomRandom!.label] = .init(room: currentRoomRandom!, prevLabel: currentRoomRandom!.label, nextLabel: nextLabel)
+                        let nextLabel = (room.label + 1) % 4
+                        charcoaled[room.label] = .init(room: room, prevLabel: room.label, nextLabel: nextLabel)
                         nextQuery.append(.charcoaled(nextLabel))
                     }
                 }
-
+                
+                cursor.moveToDoor(move.id)
                 
                 itemsAdded += 1
             }
@@ -222,7 +228,7 @@ public final class PingWorker: Worker {
             let graphBefore = knownState.constructGraph()
             let querySteps = pingQuery.queryForProcessing
             
-            let pointer = RoomState(room: knownState.rootRoom!)
+            let cursor = RoomCursor(room: knownState.rootRoom!)
             //000000000000000000000000000000
             //000000100000001000000000000000
             
@@ -237,9 +243,8 @@ public final class PingWorker: Worker {
                 
                 let recievedRoomLabel = result[i + 1]
                 
-                let door = pointer.room.doors[fromDoor]
                 // We saw this path before, therefore we should be able to follow it
-                guard let destinationRoom = door.destinationRoom else {
+                guard let destinationRoom = cursor.destinationByMoving(fromDoor) else {
                     //print("Failed to process (Broken doors. Check the Merging")
                     break
                 }
@@ -247,25 +252,15 @@ public final class PingWorker: Worker {
                 // Verify if destination room label is correct
                 if recievedRoomLabel != destinationRoom.label, destinationRoom.index == nil {
                     // Change Detected therefore we know that it the bounded room we just pinged
+                    // TODO: WTF HERE?
                     let charcoaledRoom = pingQuery.charcoaled[destinationRoom.label]!.room
                     if charcoaledRoom !== destinationRoom {
-                        let previousPotential = destinationRoom.potential
-                        let previousCharcoaledPotential = charcoaledRoom.potential
-                        //                    destinationRoom.potential = [charcoaledRoom.index!]
-                        // 1,5,6                        5,6,7
                         destinationRoom.potential = destinationRoom.potential.intersection(charcoaledRoom.potential)
                         charcoaledRoom.potential = destinationRoom.potential
                         
-                        // Ideally we want to merge these rooms together, but not right now or NOW
-                        // TODO:
-                        var processedPairs: [(Int, Int)] = []
-                        var processedRooms: [ExplorationRoom] = []
-                        _ = knownState.mergeTwoRooms(room1: destinationRoom, room2: charcoaledRoom, processedPairs: &processedPairs, processedRooms: &processedRooms)
-                        
-                        /// MERGE THEM ALL!!!
+                        _ = knownState.mergeTwoRooms(room1: destinationRoom, room2: charcoaledRoom)
                     }
                 }
-                // Temporay disabled
                 else if recievedRoomLabel == destinationRoom.label, i == pingQuery.destinationIndex {
                     // We changed that bounded one, but we didn't see the expect change in the potential
                     let charcoaledRoom = pingQuery.charcoaled[destinationRoom.label]!.room
@@ -274,15 +269,15 @@ public final class PingWorker: Worker {
                     }
                     destinationRoom.potential.removeAll(where: { $0 == charcoaledRoomIndex })
                     
-//                    print(
-//                        "🔥 Change Was not detected for room \(destinationRoom) Therefore this should be unique one or at laest we removed one potential \(charcoaledRoomIndex)"
-//                    )
                 }
                 
-                pointer.room = destinationRoom
+                cursor.moveToDoor(fromDoor)
             }
+
             // TODO: We only need to optimize and mark
-            knownState.addRoomAndCompactRooms(pointer.room)
+            knownState.addRoomAndCompactRooms(cursor.room)
+            knownState.collapseUntilDeath()
+            
             
             let graphAfter = knownState.constructGraph()
             let logState = LogState(
@@ -484,12 +479,7 @@ public final class PingWorker: Worker {
         return ExplorationRoom(label: label, path: path, roomsCount: problem.roomsCount)
     }
     
-    private final class RoomState {
-        var room: ExplorationRoom
-        init(room: ExplorationRoom) {
-            self.room = room
-        }
-    }
+
     
     // return pairs of (door, Label?)
     func parseQuery(_ query: String) -> [(Int, Int?)] {
@@ -549,7 +539,7 @@ public final class PingWorker: Worker {
                 knownState.addRoomAndCompactRooms(currentRoom)
             }
             
-            let pointer = RoomState(room: currentRoom)
+            let pointer = RoomCursor(room: currentRoom)
             
             for i in 0 ..< querySteps.count {
                 let (fromDoor, label) = querySteps[i]
@@ -564,17 +554,26 @@ public final class PingWorker: Worker {
                 log2("Current Path \(currentPath) ")
                 log2("Current Room \(pointer.room) ")
                 
-                let door = pointer.room.doors[fromDoor]
+                let door = pointer.door(fromDoor)
                 if let destinationRoom = door.destinationRoom {
                     if let idx = destinationRoom.index,
                        knownState.definedRooms[idx] !== destinationRoom
                     {
-                        door.destinationRoom = knownState.definedRooms[idx]
-                        pointer.room = knownState.definedRooms[idx]!
+                        /// Resetting where the door leads, rewriting the room
+                        // We could possibly merge information here, not sure how ofther this will happen, but let's merge here
+                        let res = knownState.mergeTwoRooms(room1: knownState.definedRooms[idx]!, room2: destinationRoom)
+
+                        // Uh oh, this is the Source door updating the destination room. This is good. We rewriting the old link to the
+                        // Known one
+                        door.destinationRoom = res
+
+                        print("⏰ Merged happened here: \(res) :yay:")
+                        pointer.moveToDoor(fromDoor)
                     } else {
-                        pointer.room = destinationRoom
+                        pointer.moveToDoor(fromDoor)
                     }
                 } else {
+                    // We created a new room, We're setting up the new door.
                     let newRoom = createExplorationRoom(label: toRoom, path: currentPath)
                     door.destinationRoom = newRoom
                     
@@ -588,27 +587,14 @@ public final class PingWorker: Worker {
                     // MAG : <--
                     knownState.addRoom(pointer.room)
                     
-                    //     0    5     0
-                    //  0 -0> 1 -5> [*0 -0> 1] ->  unbounded([*])
-                    //  0 -1> 2
-                    var curr = knownState.rootRoom!
-                    for step in currentPath {
-                        if let knownDestinationRoom = curr.doors[step].destinationRoom {
-                            curr = knownDestinationRoom
-                            log2("[1]Current room changed to \(curr)")
-                        } else {
-                            curr = newRoom
-                            log2("[2]Current room changed to \(curr)")
-                            break
-                        }
-                    }
-                    pointer.room = curr
+                    // Now we can simply move to the door, since we already know where it leads
+                    pointer.moveToDoor(fromDoor)
                     
                     log2("[3]Current room changed to \(pointer.room)")
                 }
             }
 
-            knownState.compactRooms()
+            knownState.collapseUntilDeath()
 
             let graphAfter = knownState.constructGraph()
             let logState = LogState(
