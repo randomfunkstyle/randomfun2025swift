@@ -69,16 +69,6 @@ class KnownState {
         return labels
     }
 
-    func moveByPathSafe(path: [Int]) -> ExplorationRoom? {
-        let cursor = RoomCursor(room: rootRoom!)
-        for step in path {
-            guard cursor.moveToDoor(step) != nil else {
-                return nil
-            }
-        }
-        return cursor.room
-    }
-
     func path(from: ExplorationRoom? = nil, with query: (ExplorationRoom) -> Bool) -> (
         [Int], ExplorationRoom
     )? {
@@ -181,22 +171,17 @@ class KnownState {
     func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom) -> ExplorationRoom {
         var processedPairs: [(Int, Int)] = []
         var processedRooms: [ExplorationRoom] = []
-        return mergeTwoRooms(room1: room1, room2: room2, processedPairs: &processedPairs, processedRooms: &processedRooms)
+        processChildren(unboundRoom: room1, boundRoom: room2, processedPairs: &processedPairs, processedRooms: &processedRooms)
+        return room1
     }
     
-    func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom, processedPairs: inout [(Int, Int)], processedRooms: inout [ExplorationRoom]) -> ExplorationRoom {
-        let mergedRoom = room1
-        mergedRoom.potential = room1.potential.intersection(room2.potential)
-        processedRooms.append(mergedRoom)
-        processChildren(unboundRoom: room1, boundRoom: room2, processedPairs: &processedPairs, processedRooms: &processedRooms)
-        return mergedRoom
-    }
-
     func processChildren(unboundRoom: ExplorationRoom, boundRoom: ExplorationRoom, processedPairs: inout [(Int, Int)], processedRooms: inout [ExplorationRoom]) {
         guard unboundRoom !== boundRoom else { return }
         guard !processedPairs.contains(where: { $0.0 == unboundRoom.serializationId && $0.1 == boundRoom.serializationId }) else { return }
         processedPairs.append((unboundRoom.serializationId, boundRoom.serializationId))
         processedRooms.append(unboundRoom)
+
+        unboundRoom.potential = unboundRoom.potential.intersection(boundRoom.potential)
 
         for (unboundRoomDoor, boundRoomDoor) in zip(unboundRoom.doors, boundRoom.doors) {
             // Simplest case, we don't have info about door but roomDoor has it
@@ -214,11 +199,12 @@ class KnownState {
             {
                 // Merge Information from the doorZ
 
-                let mergedRoom = mergeTwoRooms(
-                    room1: boundDestinationRoom, room2: unboundDestinationRoom, processedPairs: &processedPairs, processedRooms: &processedRooms
-                )
-                boundRoomDoor.destinationRoom = mergedRoom
-                unboundRoomDoor.destinationRoom = mergedRoom
+                let room1 = boundDestinationRoom
+                let room2 = unboundDestinationRoom
+                processChildren(unboundRoom: room1, boundRoom: room2, processedPairs: &processedPairs, processedRooms: &processedRooms)
+                
+                boundRoomDoor.destinationRoom = room1
+                unboundRoomDoor.destinationRoom = room1
             }
         }
     }

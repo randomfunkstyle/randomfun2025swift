@@ -143,6 +143,9 @@ public final class PingWorker: Worker {
             
             let initialQuery = pathToBoundRoom.map { QueryMove.move($0) } + [QueryMove.charcoaled(nextLabel)] + potential.path.map { QueryMove.move($0) }
             var destinationIndex = initialQuery.count - 1
+            guard initialQuery.count < maxQuerySize - 10 else {
+                continue
+            }
             
             var charcoaled: [Label: PingQuery.CharCoaled] = [
                 previousLabel: .init(room: bound, prevLabel: previousLabel, nextLabel: nextLabel),
@@ -250,6 +253,7 @@ public final class PingWorker: Worker {
                 // Verify if destination room label is correct
                 if recievedRoomLabel != destinationRoom.label, destinationRoom.index == nil {
                     // Change Detected therefore we know that it the bounded room we just pinged
+                    // TODO: WTF HERE?
                     let charcoaledRoom = pingQuery.charcoaled[destinationRoom.label]!.room
                     if charcoaledRoom !== destinationRoom {
                         destinationRoom.potential = destinationRoom.potential.intersection(charcoaledRoom.potential)
