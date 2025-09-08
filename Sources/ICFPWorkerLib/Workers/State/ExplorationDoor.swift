@@ -10,10 +10,10 @@ final class ExploratoinDoor: Equatable {
     var destinationRoom: ExplorationRoom?
     
     /// This is the door in the destination room that leads back to this room
-    weak var destinationDoor: ExploratoinDoor?
+    var destinationDoor: ExploratoinDoor?
 
     // This is actually a weak reference to avoid retain cycles
-    weak var owner: ExplorationRoom? = nil
+    var owner: ExplorationRoom? = nil
 
     init(id: Int, owner: ExplorationRoom?) {
         self.id = id

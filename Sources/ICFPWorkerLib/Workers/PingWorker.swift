@@ -276,6 +276,7 @@ public final class PingWorker: Worker {
 
             // TODO: We only need to optimize and mark
             knownState.addRoomAndCompactRooms(cursor.room)
+            knownState.collapseConnections()
             
             let graphAfter = knownState.constructGraph()
             let logState = LogState(
@@ -593,6 +594,7 @@ public final class PingWorker: Worker {
             }
 
             knownState.compactRooms()
+            knownState.collapseConnections()
 
             let graphAfter = knownState.constructGraph()
             let logState = LogState(

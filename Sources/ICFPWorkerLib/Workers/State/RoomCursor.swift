@@ -43,7 +43,7 @@ final class RoomCursor {
         }
         
         // Let's add the door to the external doors connections
-//        destinationRoom.externalDoorsConnections.append(sourceDoor)
+        destinationRoom.externalDoorsConnections.append(sourceDoor)
         
         /// What can we get from here... should we analyze destination doors? Let's do this in the known state?
         /// :Thinking...
