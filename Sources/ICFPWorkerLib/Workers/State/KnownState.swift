@@ -95,7 +95,7 @@ class KnownState {
         return nil
     }
 
-    func findRoomUsingCursor(with query: (ExplorationRoom) -> Bool) -> (ExplorationRoom, ExploratoinDoor)? {
+    func findRoomUsingCursor(with query: (ExplorationRoom) -> Bool) -> (ExplorationRoom, ExploratoinDoor?)? {
         let from = rootRoom!
         var queue = [(room: from, path: [ExploratoinDoor]())]
         var visited = [ExplorationRoom]()
@@ -103,7 +103,7 @@ class KnownState {
         while !queue.isEmpty {
             let (current, path) = queue.removeFirst()
             if query(current) {
-                return (current, path.last!)
+                return (current, path.last)
             }
             if visited.contains(where: { $0 === current }) {
                 continue
@@ -232,8 +232,24 @@ class KnownState {
         let label: Int // 0, 1, 2, 3
         let door: Int
     }
+    
+    func collapseUntilDeath() {
+        var collapsed = true
+        var compacted = true
+        var iteratons = 0
+//        while collapsed || compacted  {
+            collapsed = collapseConnections()
+            compacted = compactRooms()
+            iteratons = iteratons + 1
+//            guard iteratons.co
+//        }
+//        if iteratons > 2 {
+//            print("Iterations: \(iteratons)")
+//        }
+    }
 
-    func collapseConnections() {
+    func collapseConnections() -> Bool {
+        var anyCollapseHappened = false
         var proccesedRooms: [Int] = []
 
         while true {
@@ -243,7 +259,7 @@ class KnownState {
                 return true
             })
             guard !roomAndDoors.isEmpty else { break }
-            print("Found \(roomAndDoors.count) rooms to collapse ⏲")
+            // print("Found \(roomAndDoors.count) rooms to collapse ⏲")
 
              for roomAndDoor in roomAndDoors {
                 let (room, _) = roomAndDoor
@@ -256,17 +272,19 @@ class KnownState {
                 }      
 
                  _ = mergeTwoRooms(room1: definedRoom, room2: room)
+                 anyCollapseHappened = true
 
-            } 
+            }
+            
         }
 
         while true {
-            if let path = path(with: {
+            if let roomAndDoor = findRoomUsingCursor(with: {
                 guard !proccesedRooms.contains($0.serializationId) else { return false }
                 guard $0.externalDoorsConnections.count >= 6 else { return false }
                 return true
             }) {
-                let (_, room) = path
+                let (room, _) = roomAndDoor
                 proccesedRooms.append(room.serializationId)
 
                 // Try to get unique number of external connection by pair (source.label + source.door)
@@ -288,21 +306,27 @@ class KnownState {
                     
                     guard externalConnectionsByLabelAndDoor.count == 6 else { return }
                     
-//                    print("Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor.keys.map { "\($0.label):\($0.door)" }) from \(room.externalDoorsConnections.count)")
                     
+//                    print("Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor.keys.map { "\($0.label):\($0.door)" }) from \(room.externalDoorsConnections.count)")
+                    let totalConnections = externalConnectionsByLabelAndDoor.reduce(0) { $0 + $1.value.count }
+                    // print("Total connections to collapse: \(totalConnections)")
+
+                    anyCollapseHappened = true
                     var processedPairs: [(Int, Int)] = []
                     var processedRooms: [ExplorationRoom] = []
                     var finalConnections: [ExploratoinDoor] = []
                     for (labelAndDoor, externalConnections) in externalConnectionsByLabelAndDoor {
+                        
                         let owner = externalConnections.first!.owner!
                         finalConnections.append(owner.doors[labelAndDoor.door])
                         for externalConnection in externalConnections {
                             mergeToRoom(mergeTo: owner, additionalRoom: externalConnection.owner!, processedPairs: &processedPairs, processedRooms: &processedRooms)
                         }
+
                     }
                     
                     // Collapse to 6 connections
-//                    print("Collapsing to 6 connections: \(finalConnections.count) from \(room.externalDoorsConnections.count)")
+                    // print("Collapsing to 6 connections: \(room.serializationId) \(finalConnections.count) from \(totalConnections)")
                     room.externalDoorsConnections = finalConnections
                     room.has6UniqueExternals = true
                 }()
@@ -327,10 +351,11 @@ class KnownState {
 
                     guard externalConnectionsByLabelAndDoor.count == 6 else { return }
                     
-                    print("!!!!!! Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor.keys.map { "\($0.label):\($0.door)" }) from \(room.externalDoorsConnections.count)")
+                    anyCollapseHappened = true
+                    // print("!!!!!! Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor.keys.map { "\($0.label):\($0.door)" }) from \(room.externalDoorsConnections.count)")
                     
                     let totalConnections = externalConnectionsByLabelAndDoor.reduce(0) { $0 + $1.value.count }
-                    print(">>>>>> Total connections to collapse: \(totalConnections)")
+                    // print(">>>>>> Total connections to collapse: \(totalConnections)")
                     
                     var processedPairs: [(Int, Int)] = []
                     var processedRooms: [ExplorationRoom] = []
@@ -341,10 +366,27 @@ class KnownState {
                         for externalConnection in externalConnections {
                             mergeToRoom(mergeTo: owner, additionalRoom: externalConnection.owner!, processedPairs: &processedPairs, processedRooms: &processedRooms)
                         }
+                        
+//                        //         \/      \/
+//                        // OWNE + OTHER + OTHER
+//                        //
+//                        //  US      US      US
+//
+//                       for externalDoor in externalConnections {
+//                           let oldOnwer = externalDoor.owner!
+//                           guard oldOnwer.serializationId != owner.serializationId else { continue }
+//                           for connection in oldOnwer.externalDoorsConnections {
+//                               // Replace all references of ol
+//                               guard connection.destinationRoom!.serializationId != owner.serializationId  else { continue }
+//                               connection.destinationRoom = owner
+//
+//                           }
+//                       }
+
                     }
                     
                     // Collapse to 6 connections
-                    print("Collapsing to 6 connections: \(finalConnections.count) from \(room.externalDoorsConnections.count)")
+                    // print("Collapsing to 6 connections: \(finalConnections.count) from \(room.externalDoorsConnections.count)")
                     room.externalDoorsConnections = finalConnections
                     room.has6UniqueExternals = true
                 }()
@@ -352,6 +394,7 @@ class KnownState {
                 break
             }
         }
+        return anyCollapseHappened
     }
 
     func mergeToRoom(mergeTo: ExplorationRoom, additionalRoom: ExplorationRoom, processedPairs: inout [(Int, Int)], processedRooms: inout [ExplorationRoom]) {
@@ -365,7 +408,7 @@ class KnownState {
 
         for (unboundRoomDoor, boundRoomDoor) in zip(mergeTo.doors, additionalRoom.doors) {
             
-            if let dest = boundRoomDoor.destinationRoom{
+            if let dest = boundRoomDoor.destinationRoom {
                 dest.externalDoorsConnections.removeAll(where: { $0 == boundRoomDoor })
                 if !dest.externalDoorsConnections.contains(unboundRoomDoor) {
                     dest.externalDoorsConnections.append(unboundRoomDoor)
@@ -400,7 +443,8 @@ class KnownState {
         }
     }
 
-    func compactRooms() {
+    func compactRooms() -> Bool {
+        var compactHappened = false
         // Task for compact is to simplify allVisitedRooms by changing those to defined once and cleanup
         var newUnboundedRooms: [ExplorationRoom] = []
 
@@ -430,6 +474,7 @@ class KnownState {
                 definedRooms[room.index!] = room
                 logKnownState("Added unique room: with \(room.index!)")
             }
+            compactHappened = true
         }
 
         // Replace all destinationRooms to defined rooms, if possible
@@ -469,6 +514,7 @@ class KnownState {
         }
 
         unboundedRooms = newUnboundedRooms
+        return compactHappened
     }
 
     func printBoundRoomInfo() {
