@@ -176,7 +176,7 @@ public final class PingWorker: Worker {
                 guard let randomDoor = safeCurrentRoomRandom.doors.filter({ $0.destinationRoom != nil }).randomElement() else {
                     break
                 }
-                nextQuery.append(.move(Int(randomDoor.id)!))
+                nextQuery.append(.move(randomDoor.id))
                 
                 currentRoomRandom = randomDoor.destinationRoom
                 
@@ -320,7 +320,7 @@ public final class PingWorker: Worker {
                 
                 for i in 0 ..< 1 {
                     if let path = knownState.path(to: room) {
-                        let additionalQuer = path + [Int(door.id)!, i]
+                        let additionalQuer = path + [door.id, i]
                         let additionalQueryString =
                         additionalQuer.map { String($0) }.joined()
                         + generateRandomQuery()
@@ -351,7 +351,7 @@ public final class PingWorker: Worker {
                 
                 for i in 0 ..< 1 {
                     if let path = knownState.path(to: room) {
-                        let additionalQuer = path + [Int(door.id)!, i]
+                        let additionalQuer = path + [door.id, i]
                         let additionalQueryString =
                         additionalQuer.map { String($0) }.joined()
                         + generateRandomQuery()
@@ -373,7 +373,7 @@ public final class PingWorker: Worker {
 //                print("🍈 Will explore door \(door.id) in room \(room)")
                 
                 if let path = knownState.path(to: room) {
-                    let additionalQuer = path + [Int(door.id)!]
+                    let additionalQuer = path + [door.id]
                     let additionalQueryString =
                     additionalQuer.map { String($0) }.joined()
                     + generateRandomQuery()
@@ -479,7 +479,7 @@ public final class PingWorker: Worker {
                 let desinaroomIndex = allRooms.firstIndex(where: { $0 === door.destinationRoom })!
                 let toDoor = door.destinationDoor!.id
                 connections.connect(
-                    room: roomIndex, door: doorIndex, toRoom: desinaroomIndex, toDoor: Int(toDoor)!
+                    room: roomIndex, door: doorIndex, toRoom: desinaroomIndex, toDoor: toDoor
                 )
             }
         }
