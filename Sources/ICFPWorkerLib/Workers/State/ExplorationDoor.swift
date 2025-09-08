@@ -1,4 +1,4 @@
-final class ExploratoinDoor: Equatable {
+final class ExploratoinDoor: Equatable, CustomStringConvertible {
     
     static var nextID = 0
     let serializationId: Int
@@ -24,6 +24,13 @@ final class ExploratoinDoor: Equatable {
 
     static func == (lhs: ExploratoinDoor, rhs: ExploratoinDoor) -> Bool {
         return lhs.serializationId == rhs.serializationId
+    }
+    
+    var description: String {
+        let ownerId = owner!.serializationId
+        let destRoomId = (destinationRoom?.serializationId).map { String($0) } ?? "nil"
+        let destDoorId = (destinationDoor?.serializationId).map { String($0) } ?? "nil"
+        return "Door(id: \(id), owner: \(ownerId), destRoom: \(destRoomId), destDoor: \(destDoorId))"
     }
 }
 

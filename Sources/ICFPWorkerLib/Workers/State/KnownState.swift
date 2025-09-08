@@ -95,6 +95,61 @@ class KnownState {
         return nil
     }
 
+    func findRoomUsingCursor(with query: (ExplorationRoom) -> Bool) -> (ExplorationRoom, ExploratoinDoor)? {
+        let from = rootRoom!
+        var queue = [(room: from, path: [ExploratoinDoor]())]
+        var visited = [ExplorationRoom]()
+
+        while !queue.isEmpty {
+            let (current, path) = queue.removeFirst()
+            if query(current) {
+                return (current, path.last!)
+            }
+            if visited.contains(where: { $0 === current }) {
+                continue
+            }
+            visited.append(current)
+
+            for door in current.doors {
+                if let nextRoom = door.destinationRoom {
+                    if !nextRoom.externalDoorsConnections.contains(where: { $0 == door }) {
+                        nextRoom.externalDoorsConnections.append(door)
+                    }
+                    queue.append((nextRoom, path + [door]))
+                }
+            }
+        }
+        return nil
+    }
+
+    func findAllRoomsUsingCursor(with query: (ExplorationRoom) -> Bool) -> [(ExplorationRoom, ExploratoinDoor)] {
+                let from = rootRoom!
+        var queue = [(room: from, path: [ExploratoinDoor]())]
+        var visited = [ExplorationRoom]()
+        var res = [(ExplorationRoom, ExploratoinDoor)]()
+
+        while !queue.isEmpty {
+            let (current, path) = queue.removeFirst()
+            if query(current) {
+                res.append((current, path.last!))
+            }
+            if visited.contains(where: { $0 === current }) {
+                continue
+            }
+            visited.append(current)
+
+            for door in current.doors {
+                if let nextRoom = door.destinationRoom {
+                    if !nextRoom.externalDoorsConnections.contains(where: { $0 == door }) {
+                        nextRoom.externalDoorsConnections.append(door)
+                    }
+                    queue.append((nextRoom, path + [door]))
+                }
+            }
+        }
+        return res
+    }
+
     func path(to room: ExplorationRoom) -> [Int]? {
         return path(with: { $0 === room })?.0
     }
@@ -174,12 +229,36 @@ class KnownState {
     }
 
     private struct LabelAndDoor: Hashable {
-        let label: Int
+        let label: Int // 0, 1, 2, 3
         let door: Int
     }
 
     func collapseConnections() {
         var proccesedRooms: [Int] = []
+
+        while true {
+            let roomAndDoors: [(ExplorationRoom, ExploratoinDoor)] = findAllRoomsUsingCursor(with: {
+                guard let index = $0.index else { return false }
+                guard definedRooms[index]?.serializationId != $0.serializationId else { return false }
+                return true
+            })
+            guard !roomAndDoors.isEmpty else { break }
+            print("Found \(roomAndDoors.count) rooms to collapse ⏲")
+
+             for roomAndDoor in roomAndDoors {
+                let (room, _) = roomAndDoor
+//                print("Reached room \(room.index!) \(room.serializationId) through \(door.serializationId)  ")
+                let definedRoom = definedRooms[room.index!]!
+
+                for externalDoor in room.externalDoorsConnections {
+                    guard externalDoor.destinationRoom!.serializationId != definedRoom.serializationId  else { continue }
+                    externalDoor.destinationRoom = definedRoom
+                }      
+
+                 _ = mergeTwoRooms(room1: definedRoom, room2: room)
+
+            } 
+        }
 
         while true {
             if let path = path(with: {
@@ -192,35 +271,83 @@ class KnownState {
 
                 // Try to get unique number of external connection by pair (source.label + source.door)
 
-                var externalConnectionsByLabelAndDoor: [LabelAndDoor: [ExploratoinDoor]] = [:]
-
-                for externalConnection in room.externalDoorsConnections {
-                    let labelAndDoor = LabelAndDoor(label: externalConnection.owner!.label, door: externalConnection.id)
-                    externalConnectionsByLabelAndDoor[labelAndDoor, default: []].append(externalConnection)
-                }
-
-                if externalConnectionsByLabelAndDoor.count > 6 {
-                    print("This is the end, leave Earth immediately!")
-                    fatalError("There were too many external connections: \(externalConnectionsByLabelAndDoor)")
-                }
-                
-                print("Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor) from \(room.externalDoorsConnections.count)")
-
-                guard externalConnectionsByLabelAndDoor.count == 6 else { return }
-                var processedPairs: [(Int, Int)] = []
-                var processedRooms: [ExplorationRoom] = []
-                var finalConnections: [ExploratoinDoor] = []
-                for (labelAndDoor, externalConnections) in externalConnectionsByLabelAndDoor {
-                    let owner = externalConnections.first!.owner!
-                    finalConnections.append(owner.doors[labelAndDoor.door])
-                    for externalConnection in externalConnections {
-                        mergeToRoom(mergeTo: owner, additionalRoom: externalConnection.owner!, processedPairs: &processedPairs, processedRooms: &processedRooms)
+                _ = {
+                    var externalConnectionsByLabelAndDoor: [LabelAndDoor: [ExploratoinDoor]] = [:]
+                    
+                    for externalConnection in room.externalDoorsConnections {
+                        let labelAndDoor = LabelAndDoor(label: externalConnection.owner!.label, door: externalConnection.id)
+                        externalConnectionsByLabelAndDoor[labelAndDoor, default: []].append(externalConnection)
                     }
-                }
+                    
+                    if externalConnectionsByLabelAndDoor.count > 6 {
+                        print("This is the end, leave Earth immediately!")
+                        fatalError("There were too many external connections: \(externalConnectionsByLabelAndDoor)")
+                    }
+                    
+//                    print("Collapsed to \(externalConnectionsByLabelAndDoor.count)")
+                    
+                    guard externalConnectionsByLabelAndDoor.count == 6 else { return }
+                    
+//                    print("Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor.keys.map { "\($0.label):\($0.door)" }) from \(room.externalDoorsConnections.count)")
+                    
+                    var processedPairs: [(Int, Int)] = []
+                    var processedRooms: [ExplorationRoom] = []
+                    var finalConnections: [ExploratoinDoor] = []
+                    for (labelAndDoor, externalConnections) in externalConnectionsByLabelAndDoor {
+                        let owner = externalConnections.first!.owner!
+                        finalConnections.append(owner.doors[labelAndDoor.door])
+                        for externalConnection in externalConnections {
+                            mergeToRoom(mergeTo: owner, additionalRoom: externalConnection.owner!, processedPairs: &processedPairs, processedRooms: &processedRooms)
+                        }
+                    }
+                    
+                    // Collapse to 6 connections
+//                    print("Collapsing to 6 connections: \(finalConnections.count) from \(room.externalDoorsConnections.count)")
+                    room.externalDoorsConnections = finalConnections
+                    room.has6UniqueExternals = true
+                }()
+                
+                _ = {
+                    if room.has6UniqueExternals { return    }
+                    var externalConnectionsByLabelAndDoor: [LabelAndDoor: [ExploratoinDoor]] = [:]
+                    
+                    for externalConnection in room.externalDoorsConnections {
+                        if let idx = externalConnection.owner?.index {
+                            let labelAndDoor = LabelAndDoor(label: idx, door: externalConnection.id)
+                            externalConnectionsByLabelAndDoor[labelAndDoor, default: []].append(externalConnection)
+                        }
+                    }
+                    
+                    if externalConnectionsByLabelAndDoor.count > 6 {
+                        print("This is the end, leave Earth immediately!")
+                        fatalError("There were too many external connections: \(externalConnectionsByLabelAndDoor)")
+                    }
 
-                // Collapse to 6 connections
-                print("Collapsing to 6 connections: \(finalConnections) from \(room.externalDoorsConnections.count)")
-                room.externalDoorsConnections = finalConnections
+//                    print("!!!!!!! Collapsed to \(externalConnectionsByLabelAndDoor.count) from \(room.externalDoorsConnections.count)")
+
+                    guard externalConnectionsByLabelAndDoor.count == 6 else { return }
+                    
+                    print("!!!!!! Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor.keys.map { "\($0.label):\($0.door)" }) from \(room.externalDoorsConnections.count)")
+                    
+                    let totalConnections = externalConnectionsByLabelAndDoor.reduce(0) { $0 + $1.value.count }
+                    print(">>>>>> Total connections to collapse: \(totalConnections)")
+                    
+                    var processedPairs: [(Int, Int)] = []
+                    var processedRooms: [ExplorationRoom] = []
+                    var finalConnections: [ExploratoinDoor] = []
+                    for (labelAndDoor, externalConnections) in externalConnectionsByLabelAndDoor {
+                        let owner = externalConnections.first!.owner!
+                        finalConnections.append(owner.doors[labelAndDoor.door])
+                        for externalConnection in externalConnections {
+                            mergeToRoom(mergeTo: owner, additionalRoom: externalConnection.owner!, processedPairs: &processedPairs, processedRooms: &processedRooms)
+                        }
+                    }
+                    
+                    // Collapse to 6 connections
+                    print("Collapsing to 6 connections: \(finalConnections.count) from \(room.externalDoorsConnections.count)")
+                    room.externalDoorsConnections = finalConnections
+                    room.has6UniqueExternals = true
+                }()
             } else {
                 break
             }
@@ -234,17 +361,18 @@ class KnownState {
         processedRooms.append(mergeTo)
 
         mergeTo.potential = mergeTo.potential.intersection(additionalRoom.potential)
-
-        let extenalConnection = additionalRoom.externalDoorsConnections
-        for externalConnection in extenalConnection {
-            externalConnection.destinationRoom = mergeTo
-            if mergeTo.externalDoorsConnections.contains(where: { $0 == externalConnection }) {
-                continue
-            }
-            mergeTo.externalDoorsConnections.append(externalConnection)
-        }
+        
 
         for (unboundRoomDoor, boundRoomDoor) in zip(mergeTo.doors, additionalRoom.doors) {
+            
+            if let dest = boundRoomDoor.destinationRoom{
+                dest.externalDoorsConnections.removeAll(where: { $0 == boundRoomDoor })
+                if !dest.externalDoorsConnections.contains(unboundRoomDoor) {
+                    dest.externalDoorsConnections.append(unboundRoomDoor)
+                }
+
+            }
+            
             // Simplest case, we don't have info about door but roomDoor has it
             if boundRoomDoor.destinationRoom == nil,
                let roomDestination = unboundRoomDoor.destinationRoom
@@ -266,6 +394,8 @@ class KnownState {
 
                 boundRoomDoor.destinationRoom = room1
                 unboundRoomDoor.destinationRoom = room1
+                
+//                collapseConnections(room1, room2)
             }
         }
     }

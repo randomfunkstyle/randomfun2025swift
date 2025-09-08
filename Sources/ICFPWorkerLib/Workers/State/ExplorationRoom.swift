@@ -19,6 +19,8 @@ final class ExplorationRoom: CustomStringConvertible {
         return potential.first!
     }
 
+    var has6UniqueExternals: Bool = false
+    
     // External label
     let label: Int
     var path: [Int]
