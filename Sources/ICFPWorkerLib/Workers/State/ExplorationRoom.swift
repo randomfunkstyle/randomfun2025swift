@@ -59,7 +59,7 @@ final class ExplorationRoom: CustomStringConvertible {
             }
         }.joined(separator: ", ")
         return
-            "Room(label: \(label), path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
+            "Room([\(serializationId)] label: \(label),path: \(path), index: \(index.map { "✅\($0)"} ?? "?"), potential: \(potential.sorted()), doors: [\(doorsDesc)])"
     }
 }
 

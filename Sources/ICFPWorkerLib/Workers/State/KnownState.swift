@@ -203,6 +203,8 @@ class KnownState {
                     print("This is the end, leave Earth immediately!")
                     fatalError("There were too many external connections: \(externalConnectionsByLabelAndDoor)")
                 }
+                
+                print("Going to collapse into 6 connections: \(externalConnectionsByLabelAndDoor) from \(room.externalDoorsConnections.count)")
 
                 guard externalConnectionsByLabelAndDoor.count == 6 else { return }
                 var processedPairs: [(Int, Int)] = []
