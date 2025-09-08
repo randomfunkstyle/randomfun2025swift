@@ -88,7 +88,7 @@ class KnownState {
 
             for door in current.doors {
                 if let nextRoom = door.destinationRoom {
-                    queue.append((nextRoom, path + [Int(door.id)!]))
+                    queue.append((nextRoom, path + [door.id]))
                 }
             }
         }
@@ -113,7 +113,7 @@ class KnownState {
                     if visited.contains(where: { $0 === nextRoom }) {
                         continue
                     }
-                    queue.append((nextRoom, path + [Int(door.id)!]))
+                    queue.append((nextRoom, path + [door.id]))
                 }
             }
         }
@@ -147,7 +147,7 @@ class KnownState {
                     if visited.contains(where: { $0 === nextRoom }) {
                         continue
                     }
-                    queue.append((nextRoom, path + [Int(door.id)!]))
+                    queue.append((nextRoom, path + [door.id]))
                 }
             }
         }

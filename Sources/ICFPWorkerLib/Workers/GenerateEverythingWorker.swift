@@ -28,8 +28,6 @@ public final class GenerateEverythingWorker: Worker {
     
     var roomsToProcess: [Int] = []
     
-    
-    
     /// Do we have plan? ¯\_(ツ)_/¯ we don't know, but we will
     var currentRoom: Int?
     

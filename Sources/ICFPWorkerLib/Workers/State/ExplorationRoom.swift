@@ -22,7 +22,10 @@ final class ExplorationRoom: CustomStringConvertible {
     // External label
     let label: Int
     var path: [Int]
-    var doors: [ExploratoinDoor] = (0..<6).map { ExploratoinDoor(id: String($0)) }
+    let doors: [ExploratoinDoor]
+    
+    /// The list of external door connections that lead to our room. We would gather them, and then try to compact and resolve them
+    var externalDoorsConnections: [ExploratoinDoor] = []
 
     init(label: Int, path: [Int], roomsCount: Int) {
         self.label = label
@@ -35,6 +38,12 @@ final class ExplorationRoom: CustomStringConvertible {
         self.potential = potential
         self.serializationId = ExplorationRoom.nextID
         ExplorationRoom.nextID += 1
+        
+        let doors = (0..<6).map { ExploratoinDoor(id: $0, owner:nil) }
+        self.doors = doors
+        for door in doors {
+            door.owner = self
+        }
     }
 
     var description: String {

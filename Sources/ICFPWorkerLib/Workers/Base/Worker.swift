@@ -13,6 +13,7 @@ public class Worker {
 
     var maxQuerySize: Int { problem.roomsCount * 6 }
 
+    @discardableResult
     public func run() async throws -> Int? {
         /// Firs select the problem
         let selected = try await client.selectProblem(problemName: problem.name)
