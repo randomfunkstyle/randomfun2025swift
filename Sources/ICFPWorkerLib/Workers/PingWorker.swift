@@ -345,7 +345,7 @@ public final class PingWorker: Worker {
         }).filter({ room in
             room.doors.contains(where: { $0.destinationRoom == nil })
         }).shuffled().prefix(take) {
-            //            print("🍈 Found oor \(room) with unknown doors")
+//                        print("🍈 Found oor \(room) with unknown doors")
             for door in room.doors.filter({ $0.destinationRoom == nil }) {
 //                print("🍈 Will explore door \(door.id) in room \(room)")
                 
@@ -388,16 +388,6 @@ public final class PingWorker: Worker {
     
     func randomPlans() -> [String] {
         return [generateRandomQuery()]
-    }
-    
-    func complexPlans() -> [String] {
-        if !problem.complicated {
-            return []
-        }
-        
-        var plans: [String] = []
-        
-        return plans
     }
     
     override public func generatePlans() -> [String] {

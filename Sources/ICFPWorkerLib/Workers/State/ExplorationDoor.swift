@@ -1,5 +1,8 @@
 final class ExploratoinDoor {
     
+    static var nextID = 0
+    let serializationId: Int
+    
     /// Id of the door, typically "0" to "5"
     let id: Int
     
@@ -15,7 +18,10 @@ final class ExploratoinDoor {
     init(id: Int, owner: ExplorationRoom?) {
         self.id = id
         self.owner = owner
+        self.serializationId = ExplorationRoom.nextID
+        ExploratoinDoor.nextID += 1
     }
+
     
 }
 
