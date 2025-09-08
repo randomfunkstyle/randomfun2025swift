@@ -69,6 +69,16 @@ class KnownState {
         return labels
     }
 
+    func moveByPathSafe(path: [Int]) -> ExplorationRoom? {
+        let cursor = RoomCursor(room: rootRoom!)
+        for step in path {
+            guard cursor.moveToDoor(step) != nil else {
+                return nil
+            }
+        }
+        return cursor.room
+    }
+
     func path(from: ExplorationRoom? = nil, with query: (ExplorationRoom) -> Bool) -> (
         [Int], ExplorationRoom
     )? {
@@ -168,6 +178,12 @@ class KnownState {
         compactRooms()
     }
 
+    func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom) -> ExplorationRoom {
+        var processedPairs: [(Int, Int)] = []
+        var processedRooms: [ExplorationRoom] = []
+        return mergeTwoRooms(room1: room1, room2: room2, processedPairs: &processedPairs, processedRooms: &processedRooms)
+    }
+    
     func mergeTwoRooms(room1: ExplorationRoom, room2: ExplorationRoom, processedPairs: inout [(Int, Int)], processedRooms: inout [ExplorationRoom]) -> ExplorationRoom {
         let mergedRoom = room1
         mergedRoom.potential = room1.potential.intersection(room2.potential)

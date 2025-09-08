@@ -1,4 +1,4 @@
-final class ExploratoinDoor {
+final class ExploratoinDoor: Equatable {
     
     static var nextID = 0
     let serializationId: Int
@@ -22,7 +22,9 @@ final class ExploratoinDoor {
         ExploratoinDoor.nextID += 1
     }
 
-    
+    static func == (lhs: ExploratoinDoor, rhs: ExploratoinDoor) -> Bool {
+        return lhs.serializationId == rhs.serializationId
+    }
 }
 
 
