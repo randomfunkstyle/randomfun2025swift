@@ -3,6 +3,8 @@ Swift Repository for ICFP Contests 2025 of `Lambda Quakers` team for the [ICFP C
 
 ## Task
 Task is defined on the official [ICFP Contens 2025 site](https://icfpcontest2025.github.io/specs/task_from_tex.html)
+<img width="840" height="684" alt="image" src="https://github.com/user-attachments/assets/b267e5a2-346f-4347-9157-b38391e9e978" />
+
 
 # Installation
 
