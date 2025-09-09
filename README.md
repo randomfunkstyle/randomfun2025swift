@@ -1,5 +1,8 @@
 # randomfun2025swift
-Swift Repository for ICFP Contests 2025 of `Lambda Quakers` team
+Swift Repository for ICFP Contests 2025 of `Lambda Quakers` team for the [ICFP Contest 2025](https://icfpcontest2025.github.io/)
+
+## Task
+Task is defined on the official [ICFP Contens 2025 site](https://icfpcontest2025.github.io/specs/task_from_tex.html)
 
 # Installation
 
@@ -18,6 +21,7 @@ swift run icfpworker
 ```
 swift test
 ```
+
 
 ### Implementation details
 
