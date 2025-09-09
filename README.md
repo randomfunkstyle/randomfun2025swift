@@ -183,6 +183,10 @@ flowchart LR
 - Anyways, the algorithm is working and generates the map of the library.
 - Comparation of the rooms through isDifferent method was too slow, since if deep was big enough, and the rooms were basically the same, then the results was 'likely not different' but we werent' able to know for sure that they are the same.
 
+The image below shows, that our approach was a bit inefficient :)
+<img width="1278" height="505" alt="image" src="https://github.com/user-attachments/assets/8ee97988-151d-4827-b176-34f3f9e463df" />
+
+
 # Scores
 Last known information about the scores
 These would potentially put us around 34ish place. 
