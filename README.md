@@ -31,8 +31,8 @@ Once all distinc rooms were found, the algrorightm would try to move through the
 
 Only after all the doors were explored, the algorightm would try to create map of the library, and define the door to door connections.
 
-```
-flowchart TD
+```mermaid
+flowchart LR
     A[Start] --> B[Initialize FindEverythingWorker]
     B --> C[Create nodes as you explore randomly]
     C --> D[For each node: set Possibilities = All N rooms]
@@ -66,8 +66,7 @@ flowchart TD
 
 This is and exaple of the potential graph, after movement.
 
-```
-graph LR
+```mermaid
 graph LR
 
   %% Room 0
@@ -129,7 +128,7 @@ Once exploration performed, then next move was to perform 'pings' movements, whi
 - If the value of the room we were intereseted it wasn't changed, we removed the possiblity of being the `bound` room.
 - In the best case scenario, this would generate a new distinct room, and we can proceed with the next room.
 
-```
+```mermaid
 flowchart LR
     subgraph Room1
     R0((0))
@@ -148,7 +147,7 @@ flowchart LR
 
 ```
 
-```
+```mermaid
 flowchart LR
     subgraph Room1-Marked
     R0((1*))

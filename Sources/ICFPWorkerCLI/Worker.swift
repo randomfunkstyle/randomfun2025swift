@@ -67,9 +67,9 @@ struct CountLines: AsyncParsableCommand {
                 timeFormatter.dateFormat = "HH:mm:ss"
    
                 while true {
-                    for depth in (3...5).reversed() {
+                    for depth in (5...5).reversed() {
                         for take in (1...5).reversed() {
-                            for p in problems {
+                            for p in problems.shuffled() {
 
                                 let ttake = take * 3
                                 let currentTime = Date()
